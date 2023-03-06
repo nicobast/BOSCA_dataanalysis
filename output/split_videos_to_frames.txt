@@ -1,0 +1,1 @@
+C:\Users\Nico\PowerFolders\project_video_salience\code\python_code_salience_extraction\split_video_to_images.py "neutral_rabbit_left" "C:\Users\Nico\PowerFolders\ETbat\Jointattention\stimuli\blockB"
