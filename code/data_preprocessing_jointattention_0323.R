@@ -871,9 +871,16 @@ df_jointatt<-df_jointatt[df_jointatt$ts_event<=3300,]
 df_jointatt$group<-ifelse(grepl('_K',df_jointatt$id),'TD','ASD')
 
 #create timepoint variable
+table(df_jointatt$id)
+
 df_jointatt$timepoint<-ifelse(grepl('_t2',df_jointatt$id) | grepl('_T2',df_jointatt$id),'T2',
                              ifelse(grepl('_t4',df_jointatt$id) | grepl('_T4',df_jointatt$id),'T4',
-                                    ifelse(grepl('_t6',df_jointatt$id) | grepl('_T6',df_jointatt$id),'T6','K')))
+                                    ifelse(grepl('_t6',df_jointatt$id) | grepl('_T6',df_jointatt$id),'T6',
+                                           ifelse(grepl('_fu2',df_jointatt$id) | grepl('_FU2',df_jointatt$id),'FU2',
+                                                         ifelse(grepl('_fu3',df_jointatt$id) | grepl('_FU3',df_jointatt$id),'FU3',
+                                                                       ifelse(grepl('K_fu',df_jointatt$id) | grepl('K_FU',df_jointatt$id) | grepl('k_FU',df_jointatt$id) | grepl('k_fu',df_jointatt$id),'K_FU','K'))))))
+
+table(df_jointatt$timepoint)
 
 #create individual id variable
 df_jointatt$pic<-substr(df_jointatt$id,1,3)
