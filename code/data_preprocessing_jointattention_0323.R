@@ -866,13 +866,10 @@ df_jointatt<-df_jointatt[df_jointatt$ts_event<=3300,]
 
 ### - CREATE PIC, GROUP, TIMEPOINT, CONDITION, STIMULUS, POSITION, VARIABLE ####
 
-
 #create group variable
 df_jointatt$group<-ifelse(grepl('_K',df_jointatt$id),'TD','ASD')
 
 #create timepoint variable
-table(df_jointatt$id)
-
 df_jointatt$timepoint<-ifelse(grepl('_t2',df_jointatt$id) | grepl('_T2',df_jointatt$id),'T2',
                              ifelse(grepl('_t4',df_jointatt$id) | grepl('_T4',df_jointatt$id),'T4',
                                     ifelse(grepl('_t6',df_jointatt$id) | grepl('_T6',df_jointatt$id),'T6',
@@ -1087,14 +1084,25 @@ df_jointatt$rja_late<-ifelse(df_jointatt$rja_when>1200 & df_jointatt$rja_when<21
     #  with(df_jointatt,table(rja,timepoint)
     # #-->descriptive higher rja rate in TD
 
-    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_histogram()+facet_wrap(~condition+group)+theme_bw()
-    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+facet_grid(vars(condition),vars(group))+theme_bw()
-    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density(alpha=0.5)+theme_bw()
-    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+theme_bw()
+    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_histogram()+facet_wrap(~condition+group)+theme_bw()
+    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+facet_grid(vars(condition),vars(group))+theme_bw()
+    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density(alpha=0.5)+theme_bw()
+    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+theme_bw()
 
 #- DEMOGRAPHIC DATA #####
 
 load("C:/Users/Nico/PowerFolders/project_visualsearch/data/demogr_data_270722")
+
+    unique(df_jointatt$pic)
+    demogr$id
+    ###->
+    unique(df_jointatt$pic)[!(unique(df_jointatt$pic) %in% substr(demogr$id,1,3))]
+    ### two have ET data but no demographics
+    table(df_jointatt$id)
+
+    ggplot(df_jointatt[df_jointatt$id=='970_K',],aes(x=rja_when))+geom_density(alpha=0.5)+theme_bw()
+    ggplot(df_jointatt[df_jointatt$id=='970_k_fu',],aes(x=rja_when))+geom_density(alpha=0.5)+theme_bw()
+
 
 unique(demogr$id)
 demogr$id<-substr(demogr$id,1,3)
@@ -1130,8 +1138,10 @@ demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
     sort(demogr$test_age[demogr$group=='TD'])
 
     ## - remove IDs with test_age higher than max of ASD (helps in matching) ####
-    demogr<-demogr[demogr$test_age < max(demogr$test_age[demogr$group=='ASD']),]
+    #demogr<-demogr[demogr$test_age < max(demogr$test_age[demogr$group=='ASD']),]
 
+
+    ###no matching required in final sample, when treatment versus control is unblinded
 
     ### --> match sample ####
     require(MatchIt)
@@ -1144,7 +1154,7 @@ demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
                        data=demogr,
                        method='nearest',discard='both',
                        ratio=8, #match four controls to each ASD
-                       replace=T,caliper=0.1)
+                       replace=T,caliper=0.10)
 
     all.match
 
@@ -1172,12 +1182,14 @@ table(df_jointatt$index_trial)
 length(unique(df_jointatt$id)) #data of 171 measurement timepoints after matching
 length(unique(df_jointatt$pic)) #data of 101 participants after matching)
 by(df_jointatt$id,df_jointatt$timepoint,function(x){length(unique(x))})
-##--> after matching: K = 44, T2 = 51, T4 = 44, T6 = 32
+##--> after matching (September 2022): K = 44, T2 = 51, T4 = 44, T6 = 32
+##--> without matching (March 2023): K = 61, T2 = 62, T4 = 53, T6 = 47, K_FU = 17, FU2 = 14, FU3 = 1
+
 
 #missing data
-table(is.na(df_jointatt$rpd))[2]/sum(table(is.na(df_jointatt$rpd))) #--> 46.2 missing data in pupil data
-table(is.na(df_jointatt$gazepos_x))[2]/sum(table(is.na(df_jointatt$gazepos_x))) #--> 54.4% missing data in gaze x
-table(is.na(df_jointatt$gazepos_y))[2]/sum(table(is.na(df_jointatt$gazepos_y))) #--> 59.2% missing data in gaze y
+table(is.na(df_jointatt$rpd))[2]/sum(table(is.na(df_jointatt$rpd))) #--> 43.7 missing data in pupil data
+table(is.na(df_jointatt$gazepos_x))[2]/sum(table(is.na(df_jointatt$gazepos_x))) #--> 52.3% missing data in gaze x
+table(is.na(df_jointatt$gazepos_y))[2]/sum(table(is.na(df_jointatt$gazepos_y))) #--> 56.7% missing data in gaze y
 
 table(df_jointatt$saccade) #roughly 10% saccade data is plausible
 table(df_jointatt$fixation) #roughly 90% fixation data is plausible
@@ -1202,10 +1214,10 @@ hist(as.numeric(with(df_jointatt[df_jointatt$fixation,],
 #gaze behavior
 require(ggplot2)
 require(hexbin)
-ggplot(df_jointatt,aes(x=gazepos_x,y=gazepos_y))+
-  geom_hex(bins=30)+
-  scale_fill_gradientn(colours=rev(rainbow(3)))+
-  ylim(1,0)+xlim(0,1)+coord_fixed(ratio = 9/16)
+# ggplot(df_jointatt,aes(x=gazepos_x,y=gazepos_y))+
+#   geom_hex(bins=30)+
+#   scale_fill_gradientn(colours=rev(rainbow(3)))+
+#   ylim(1,0)+xlim(0,1)+coord_fixed(ratio = 9/16)
 
 ggplot(df_jointatt,aes(x=gazepos_x,y=gazepos_y))+
   stat_density_2d(aes(fill=after_stat(density)), n=50, geom = "raster", contour = FALSE)+
@@ -1476,14 +1488,21 @@ df_trial<-data.frame(id,pic,group,timepoint,index_trial,condition,stimulus,posit
                      rja_occurances,rja_t_mean,rja_t_sd,no_data)
 
 
-###---> merge demographics and df_trial ####
-df_trial<-merge(df_trial,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id',all.x=T)
+###---> merge demographics and df_trial - corrects for matched participants ####
 
-df_jointatt<-merge(df_jointatt,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id')
+warning('did you match data, then look here')
+# #for matched
+# df_trial<-merge(df_trial,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id',all.x=T)
+# df_jointatt<-merge(df_jointatt,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id')
+
+#for unmatched
+df_trial<-merge(df_trial,demogr,by.x='pic',by.y='id',all.x=T)
+df_jointatt<-merge(df_jointatt,demogr,by.x='pic',by.y='id')
+
 
 ###--> save final data frame ####
 
-save(df_jointatt, df_trial, all.match, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_101022.Rdata"))
+save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_060323.Rdata"))
 
   ### --------------- ####
 
@@ -1499,13 +1518,20 @@ save(df_jointatt, df_trial, all.match, file=paste0(home_path,project_path,"/data
   unique_id<-unique(df_trial$id)
   unique_id<-unique_id[complete.cases(unique_id)] #remove NA
   pic<-substr(unique_id,1,3)
-  timepoint<-substr(unique_id,5,6)
+  timepoint<-substr(unique_id,5,8)
   timepoint<-ifelse(grepl('t2',timepoint) | grepl('T2',timepoint),'T2',
                     ifelse(grepl('t4',timepoint) | grepl('T4',timepoint),'T4',
-                           ifelse(grepl('t6',timepoint) | grepl('T6',timepoint),'T6','K')))
+                           ifelse(grepl('t6',timepoint) | grepl('T6',timepoint),'T6',
+                                  ifelse(grepl('fu2',timepoint) | grepl('FU2',timepoint),'FU2',
+                                         ifelse(grepl('fu3',timepoint) | grepl('FU3',timepoint),'FU3',
+                                                ifelse(grepl('K_fu',timepoint) | grepl('K_FU',timepoint) | grepl('k_FU',timepoint) | grepl('k_fu',timepoint),'K_FU','K'))))))
+
 
   df_timepoint<-data.frame(unique_id,pic,timepoint)
-  df_timepoint<-merge(df_timepoint,all.match,by.x='pic',by.y='id')
+  #df_timepoint<-merge(df_timepoint,all.match,by.x='pic',by.y='id')
+  df_timepoint<-merge(df_timepoint,demogr,by.x='pic',by.y='id')
+
+
   ###--> per participant data-frame
 
   #standard descriptives
@@ -1529,20 +1555,39 @@ save(df_jointatt, df_trial, all.match, file=paste0(home_path,project_path,"/data
                             rja_duration,fixation_duration,rpd_middle,no_data)
 
 
+  descriptives_table<-descriptives_table[,c(5,6,7,1,3,4)]
+
   row_names<-c('n','gender (F/M)','test age (months)','age (months)','IQ','SRS-16','RBSR','CBCL total (T)','RJA duration (s)','fixation duration (s)','pupillary response (z)','missing data (%)')
 
 
   descriptives_table<-cbind(row_names,descriptives_table)
   descriptives_table<-ifelse(descriptives_table=='0','<0.001',descriptives_table)
 
+
   require(kableExtra)
   table_sample<-descriptives_table %>%
     kbl(caption = "Sample description",
-        col.names = c('','NTC','ASD (T2)','ASD (T4)','ASD (T6)'),
+        col.names = c('','ASD (T2)','ASD (T4)','ASD (T6)','ASD (FU2)','NTC (T2)','NTC (FU2)'),
         row.names = F) %>%
     kable_classic(full_width = F, html_font = "Cambria")
 
   table_sample
+
+  ####date of measurement #####
+
+  date_of_measurement<-as.numeric(with(df_jointatt,by(timestamp,id,median)))/1000000 #microsecond format to seconds
+  date_of_measurement<-as.Date(as.POSIXct(date_of_measurement, origin="1970-01-01"))
+  id_of_measurement<-as.character(with(df_jointatt,by(id,id,head,n=1)))
+  df_date_measure<-data.frame(id=id_of_measurement,date=date_of_measurement)
+
+  hist(date_of_measurement,20)
+  df_timepoint<-merge(df_timepoint,df_date_measure,by.x='unique_id',by.y = 'id')
+
+  factor(df_timepoint$timepoint)
+
+  df_timepoint$timepoint <- factor(df_timepoint$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
+  ggplot(df_timepoint[df_timepoint$timepoint!='FU3',],aes(x=date,fill=timepoint))+geom_histogram(bins=50)+theme_bw()
+
 
   ####--> create df_ids ####
 
