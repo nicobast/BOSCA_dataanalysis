@@ -274,7 +274,7 @@ fun_screen_att<-function(x){
 
   return(x)
 }
-list_jointatt<-lapply(list_jointatt,fun_screen_att)
+list_jointatt<-pblapply(list_jointatt,fun_screen_att)
 
 ## -- retrieve screen distance ####
 fun_screen_dist<-function(x){
@@ -300,7 +300,7 @@ fun_screen_dist<-function(x){
   return(x)
 
 }
-list_jointatt<-lapply(list_jointatt,fun_screen_dist)
+list_jointatt<-pblapply(list_jointatt,fun_screen_dist)
 
 ## -- drop unecessary data + particiapnts without data --> subsequent preprocessing requires far less RAM####
 fun_required_necessary_data<-function(x){
@@ -310,7 +310,7 @@ fun_required_necessary_data<-function(x){
   return(x)
 
 }
-list_jointatt<-lapply(list_jointatt,fun_required_necessary_data)
+list_jointatt<-pblapply(list_jointatt,fun_required_necessary_data)
 
 ## -- remove participants without data
 dropped_participants<-which(sapply(list_jointatt,function(x){nrow(x)==0}))
@@ -477,7 +477,7 @@ fun_gaze_preprocess<-function(x){
 
 }
 
-list_jointatt<-lapply(list_jointatt,fun_gaze_preprocess)
+list_jointatt<-pblapply(list_jointatt,fun_gaze_preprocess)
 
 #saccade identification based on velocity
 fun_saccade_ident<-function(x){
@@ -577,7 +577,7 @@ fun_saccade_ident<-function(x){
   return(x)
 }
 
-list_jointatt<-lapply(list_jointatt,fun_saccade_ident)
+list_jointatt<-pblapply(list_jointatt,fun_saccade_ident)
 
 #fixation identification
 fun_fixation_ident<-function(x,degree_fixation_cutoff=1,duration_fixation_cutoff=30){
@@ -656,7 +656,7 @@ fun_fixation_ident<-function(x,degree_fixation_cutoff=1,duration_fixation_cutoff
 
 }
 
-list_jointatt<-lapply(list_jointatt,fun_fixation_ident)
+list_jointatt<-pblapply(list_jointatt,fun_fixation_ident)
 
 ## ----------> PUPIL Preprocessing (Kret, 2018) -------------- ####
 
@@ -853,7 +853,7 @@ list_jointatt<-lapply(list_jointatt,fun_baseline)
 df_jointatt<-dplyr::bind_rows(list_jointatt)
 
 #save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060922.Rdata"))
-save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_150922.Rdata"))
+save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060323.Rdata"))
 
 #### limit data to first 11 seconds ####
 
