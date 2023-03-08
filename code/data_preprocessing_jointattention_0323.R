@@ -82,10 +82,10 @@ id_names_events<-substr(data.events,nchar("C:/Users/Nico/PowerFolders/data_AFFIP
 
 id_names_files[!(id_names_files %in% id_names_time)]
 id_names_events[!(id_names_events %in% id_names_time)]
+##--> empty
 
-data.files<-data.files[data.files!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_gazedata.csv"]
-data.events<-data.events[data.events!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_event.csv"]
-
+# data.files<-data.files[data.files!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_gazedata.csv"]
+# data.events<-data.events[data.events!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_event.csv"]
 
 #sorting - that files names match (k_fu introduced different sorting in data.files versus data.events)
 ###--> sort according to participant id
@@ -160,6 +160,7 @@ rm(df.list.data, df.list.events, df.list.time)
 
 #save(df,file="F:/temp_data_AFFIP/all_data_merged_040722.Rdata")
 #save(df,file="C:/Users/nico/Desktop/BOSCA_joint_attention_all_data_merged_060323.Rdata")
+save(df,file="C:/Users/nico/Desktop/BOSCA_joint_attention_all_data_merged_070323.Rdata")
 
 #now found on NAS
 
@@ -853,7 +854,7 @@ list_jointatt<-lapply(list_jointatt,fun_baseline)
 df_jointatt<-dplyr::bind_rows(list_jointatt)
 
 #save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060922.Rdata"))
-save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060323.Rdata"))
+save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_070323.Rdata"))
 
 #### limit data to first 11 seconds ####
 
@@ -1084,14 +1085,30 @@ df_jointatt$rja_late<-ifelse(df_jointatt$rja_when>1200 & df_jointatt$rja_when<21
     #  with(df_jointatt,table(rja,timepoint)
     # #-->descriptive higher rja rate in TD
 
-    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_histogram()+facet_wrap(~condition+group)+theme_bw()
-    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+facet_grid(vars(condition),vars(group))+theme_bw()
-    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density(alpha=0.5)+theme_bw()
-    ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+theme_bw()
+    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_histogram()+facet_wrap(~condition+group)+theme_bw()
+    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+facet_grid(vars(condition),vars(group))+theme_bw()
+    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density(alpha=0.5)+theme_bw()
+    # ggplot(df_jointatt,aes(x=rja_when,group=group,fill=group))+geom_density()+theme_bw()
+    #
+    # summary(df_jointatt$rja)
+    # with(df_jointatt,table(index_trial))
+    # with(df_jointatt,table(droplevels(eventlog)))
+    # with(df_jointatt,hist(gazepos_x))
+    # with(df_jointatt,hist(gazepos_y))
+    # with(df_jointatt,hist(rpd))
+    # with(df_jointatt,table(rja))
+
 
 #- DEMOGRAPHIC DATA #####
 
-load("C:/Users/Nico/PowerFolders/project_visualsearch/data/demogr_data_270722")
+#demogr
+#load("C:/Users/Nico/PowerFolders/project_visualsearch/data/demogr_data_270722")
+load(paste0(home_path,project_path,"/data/demogr_data_270722"))
+# #d
+# load(paste0(home_path,project_path,"/data/demogr_data_Dec2022_onlyAgeIqSex"))
+# with(d,by(test_age,Testzeitpunkt,mean))
+# with(d,table(Testzeitpunkt))
+
 
     unique(df_jointatt$pic)
     demogr$id
@@ -1099,10 +1116,6 @@ load("C:/Users/Nico/PowerFolders/project_visualsearch/data/demogr_data_270722")
     unique(df_jointatt$pic)[!(unique(df_jointatt$pic) %in% substr(demogr$id,1,3))]
     ### two have ET data but no demographics
     table(df_jointatt$id)
-
-    ggplot(df_jointatt[df_jointatt$id=='970_K',],aes(x=rja_when))+geom_density(alpha=0.5)+theme_bw()
-    ggplot(df_jointatt[df_jointatt$id=='970_k_fu',],aes(x=rja_when))+geom_density(alpha=0.5)+theme_bw()
-
 
 unique(demogr$id)
 demogr$id<-substr(demogr$id,1,3)
@@ -1154,7 +1167,7 @@ demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
                        data=demogr,
                        method='nearest',discard='both',
                        ratio=8, #match four controls to each ASD
-                       replace=T,caliper=0.10)
+                       replace=T,caliper=0.20)
 
     all.match
 
@@ -1165,7 +1178,7 @@ demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
 
     with(all.match,t.test(test_age~group))
 
-    df_jointatt<-df_jointatt[df_jointatt$pic %in% all.match$id,]
+    #df_jointatt<-df_jointatt[df_jointatt$pic %in% all.match$id,]
 
 #--> DATA PLAUSIBILITY AFTER MATCHING ####
 
@@ -1183,13 +1196,13 @@ length(unique(df_jointatt$id)) #data of 171 measurement timepoints after matchin
 length(unique(df_jointatt$pic)) #data of 101 participants after matching)
 by(df_jointatt$id,df_jointatt$timepoint,function(x){length(unique(x))})
 ##--> after matching (September 2022): K = 44, T2 = 51, T4 = 44, T6 = 32
-##--> without matching (March 2023): K = 61, T2 = 62, T4 = 53, T6 = 47, K_FU = 17, FU2 = 14, FU3 = 1
+##--> without matching (March 2023): K = 65, T2 = 62, T4 = 53, T6 = 47, K_FU = 20, FU2 = 15, FU3 = 2
 
 
 #missing data
-table(is.na(df_jointatt$rpd))[2]/sum(table(is.na(df_jointatt$rpd))) #--> 43.7 missing data in pupil data
-table(is.na(df_jointatt$gazepos_x))[2]/sum(table(is.na(df_jointatt$gazepos_x))) #--> 52.3% missing data in gaze x
-table(is.na(df_jointatt$gazepos_y))[2]/sum(table(is.na(df_jointatt$gazepos_y))) #--> 56.7% missing data in gaze y
+table(is.na(df_jointatt$rpd))[2]/sum(table(is.na(df_jointatt$rpd))) #--> 43.2 missing data in pupil data
+table(is.na(df_jointatt$gazepos_x))[2]/sum(table(is.na(df_jointatt$gazepos_x))) #--> 51.8% missing data in gaze x
+table(is.na(df_jointatt$gazepos_y))[2]/sum(table(is.na(df_jointatt$gazepos_y))) #--> 56.0% missing data in gaze y
 
 table(df_jointatt$saccade) #roughly 10% saccade data is plausible
 table(df_jointatt$fixation) #roughly 90% fixation data is plausible
@@ -1296,6 +1309,8 @@ ggplot(df_jointatt[df_jointatt$ts_event>1000 & df_jointatt$ts_event<1100,],aes(x
 
 ### --> visualize RJA ####
 
+
+
 ##RJA
 ggplot(df_jointatt,aes(x=rja_when/300))+
   geom_density(fill='orange')+
@@ -1306,8 +1321,11 @@ ggplot(df_jointatt,aes(x=rja_when/300))+
   theme_bw()
 
 
+#change facotr ordering
+#df_jointatt$timepoint <- factor(df_jointatt$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
 ##RJA between timepoints
-ggplot(df_jointatt,aes(x=rja_when/300,group=timepoint,fill=timepoint))+
+df_jointatt$group<-with(df_jointatt,ifelse(grepl('K',timepoint),'NTC','ASD'))
+ggplot(df_jointatt[df_jointatt$timepoint!='FU3',],aes(x=rja_when/300,group=timepoint,fill=group))+
   geom_density()+
   #geom_freqpoly()+
   labs(x='video duration (s)',y='RJA occurances (density)')+
@@ -1360,6 +1378,7 @@ ggplot(df_jointatt[sample(1:nrow(df_jointatt),size=nrow(df_jointatt)/100),],aes(
   ###--> pupillary response is not a six degree polynomial
 
 #--> between timepoints
+df_jointatt<-df_jointatt[ df_jointatt$timepoint!='FU3',] #remove FU3
 ggplot(df_jointatt[sample(1:nrow(df_jointatt),size=nrow(df_jointatt)/5),],aes(x=ts_event/300,y=rpd,group=timepoint,color=timepoint))+
   geom_smooth()+theme_bw()+labs(title='pupil size within trial',x='video duration (s)',y='pupil size change (mm)')+
   geom_vline(xintercept=1)+geom_vline(xintercept=3,linetype='dashed')+geom_vline(xintercept=9,linetype='dashed')
@@ -1490,29 +1509,22 @@ df_trial<-data.frame(id,pic,group,timepoint,index_trial,condition,stimulus,posit
 
 ###---> merge demographics and df_trial - corrects for matched participants ####
 
-warning('did you match data, then look here')
+warning('did you match data, then look here + latest dmeographic file required')
 # #for matched
 # df_trial<-merge(df_trial,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id',all.x=T)
 # df_jointatt<-merge(df_jointatt,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id')
 
-#for unmatched
+#for unmatched --> latest demographic file required
 df_trial<-merge(df_trial,demogr,by.x='pic',by.y='id',all.x=T)
-df_jointatt<-merge(df_jointatt,demogr,by.x='pic',by.y='id')
-
+df_jointatt<-merge(df_jointatt,demogr,by.x='pic',by.y='id',all.x = T)
 
 ###--> save final data frame ####
 
-save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_060323.Rdata"))
+save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_070323.Rdata"))
 
   ### --------------- ####
 
-  ## DESCRIPTIVE TABLE ####
-
-  fun_return_descriptive<-function(variable,group){
-    mean_values<-by(variable,group,function(x){round(mean(x,na.rm=T),2)})
-    sd_values<-by(variable,group,function(x){round(sd(x,na.rm=T),2)})
-    paste0(mean_values,'/',sd_values)
-  }
+  ## CREATE DF_TIMEPOINT --> calcualte age at timepoints and date of measurement####
 
   #data frame aggegated by timepoint
   unique_id<-unique(df_trial$id)
@@ -1531,14 +1543,64 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   #df_timepoint<-merge(df_timepoint,all.match,by.x='pic',by.y='id')
   df_timepoint<-merge(df_timepoint,demogr,by.x='pic',by.y='id')
 
+  df_timepoint$timepoint <- factor(df_timepoint$timepoint, levels = c("FU2", "FU3","K","K_FU","T2", "T4", "T6"))
+
+
+  table(df_timepoint$timepoint)
 
   ###--> per participant data-frame
 
+  #### - date of measurement #####
+
+  date_of_measurement<-as.numeric(with(df_jointatt,by(timestamp,id,median)))/1000000 #microsecond format to seconds
+  date_of_measurement<-as.Date(as.POSIXct(date_of_measurement, origin="1970-01-01"))
+  id_of_measurement<-as.character(with(df_jointatt,by(id,id,head,n=1)))
+  df_date_measure<-data.frame(id=id_of_measurement,date=date_of_measurement)
+
+  hist(date_of_measurement,20)
+  df_timepoint<-merge(df_timepoint,df_date_measure,by.x='unique_id',by.y = 'id')
+
+  df_timepoint$timepoint <- factor(df_timepoint$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
+
+  ggplot(df_timepoint[df_timepoint$timepoint!='FU3',],aes(x=date,fill=timepoint))+geom_histogram(bins=50)+theme_bw()
+
+  ggplot(df_timepoint[df_timepoint$timepoint!='FU3',],aes(x=pic,y=date,color=timepoint))+geom_point()+theme_bw()+labs(x='participant')
+
+
+
+  #### - caluclate age at date ####
+
+  list_initial_date<-with(df_timepoint,by(date,pic,min,simplify=FALSE))
+  initial_date<-as.Date(sapply(list_initial_date,paste))
+  df_initial_date<-data.frame(pic=names(list_initial_date),initial_date)
+  df_timepoint<-merge(df_timepoint,df_initial_date,by='pic')
+  difference_in_months<-(df_timepoint$date-df_timepoint$initial_date)/30
+
+  df_timepoint$age_months_at_date<-as.numeric(df_timepoint$age_months+difference_in_months)
+
+  #### --> merge df_timepoint to df_trial ####
+
+  df_timepoint_merge<-df_timepoint[,!(names(df_timepoint) %in% names(df_trial))]
+  df_trial<-merge(df_trial,df_timepoint_merge,by.x='id',by.y='unique_id',all.x=T)
+
+  ## DESCRIPTIVE TABLE ####
+
+  fun_return_descriptive<-function(variable,group){
+    mean_values<-by(variable,group,function(x){round(mean(x,na.rm=T),2)})
+    sd_values<-by(variable,group,function(x){round(sd(x,na.rm=T),2)})
+    paste0(mean_values,'/',sd_values)
+  }
+
+  #order factors
+  #df_timepoint$timepoint <- factor(df_timepoint$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
+
   #standard descriptives
-  n_timepoint<-with(df_trial,by(id,timepoint,function(x){length(unique(x))}))
+  #n_timepoint<-with(df_trial,by(id,timepoint,function(x){length(unique(x))}))
+  n_timepoint<-with(df_timepoint,by(pic,timepoint,function(x){length(unique(x))}))
   gender<-with(df_timepoint,by(Geschlecht_Index,timepoint,function(x){paste0(table(x)[2],'/',table(x)[1])}))
   test_age<-with(df_timepoint,fun_return_descriptive(variable=test_age,group=timepoint))
   age<-with(df_timepoint,fun_return_descriptive(variable=age_months,group=timepoint))
+  age_at_date<-with(df_timepoint,fun_return_descriptive(variable=age_months_at_date,group=timepoint))
   iq<-with(df_timepoint,fun_return_descriptive(variable=IQ,group=timepoint))
   srs_16<-with(df_timepoint,fun_return_descriptive(variable=srs_sum,group=timepoint))
   rbsr<-with(df_timepoint,fun_return_descriptive(variable=RBSR_ges,group=timepoint))
@@ -1551,13 +1613,16 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   no_data<-with(df_trial,fun_return_descriptive(variable=no_data,group=timepoint))
 
 
-  descriptives_table<-rbind(n_timepoint,gender,test_age,age,iq,srs_16,rbsr,cbcl_ges,
+  descriptives_table<-rbind(n_timepoint,gender,age_at_date,age,test_age,iq,srs_16,rbsr,cbcl_ges,
                             rja_duration,fixation_duration,rpd_middle,no_data)
 
+  #remove FU3
+  descriptives_table<-descriptives_table[,-5]
 
-  descriptives_table<-descriptives_table[,c(5,6,7,1,3,4)]
 
-  row_names<-c('n','gender (F/M)','test age (months)','age (months)','IQ','SRS-16','RBSR','CBCL total (T)','RJA duration (s)','fixation duration (s)','pupillary response (z)','missing data (%)')
+  #descriptives_table<-descriptives_table[,c(5,6,7,1,3,4)]
+
+  row_names<-c('n','gender (F/M)','age at date (months)','age (at T2; months)','test age (at T2; months)','IQ (at T2)','SRS-16','RBSR','CBCL total (T)','RJA duration (s)','fixation duration (s)','pupillary response (z)','missing data (%)')
 
 
   descriptives_table<-cbind(row_names,descriptives_table)
@@ -1573,35 +1638,24 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
   table_sample
 
-  ####date of measurement #####
-
-  date_of_measurement<-as.numeric(with(df_jointatt,by(timestamp,id,median)))/1000000 #microsecond format to seconds
-  date_of_measurement<-as.Date(as.POSIXct(date_of_measurement, origin="1970-01-01"))
-  id_of_measurement<-as.character(with(df_jointatt,by(id,id,head,n=1)))
-  df_date_measure<-data.frame(id=id_of_measurement,date=date_of_measurement)
-
-  hist(date_of_measurement,20)
-  df_timepoint<-merge(df_timepoint,df_date_measure,by.x='unique_id',by.y = 'id')
-
-  factor(df_timepoint$timepoint)
-
-  df_timepoint$timepoint <- factor(df_timepoint$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
-  ggplot(df_timepoint[df_timepoint$timepoint!='FU3',],aes(x=date,fill=timepoint))+geom_histogram(bins=50)+theme_bw()
 
 
-  ####--> create df_ids ####
+  ####--> create df_ids (one row per individual)####
 
-  table(timepoint,pic)
+  table(df_timepoint$pic,df_timepoint$timepoint)
 
   #which measurement timepoin ts are available
-  which_timepoints<-ifelse(table(pic,df_timepoint$timepoint)[,2]==1 & table(pic)==3,'T2+T4+T6',
-                           ifelse(table(pic,df_timepoint$timepoint)[,2]==1 & table(pic)==2,'T2+T4',
-                                  ifelse(table(pic,df_timepoint$timepoint)[,2]==1 & table(pic)==1,'T2',
-                                         ifelse(table(pic,df_timepoint$timepoint)[,1]==1 & table(pic)==1,'K','Other'))))
+  which_timepoints<-ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,4]==1 & table(df_timepoint$pic) %in% c(4,5),'T2+T4+T6+FU2',
+                        ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,3]==1 & table(df_timepoint$pic)==3,'T2+T4+T6',
+                           ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,2]==1 & table(df_timepoint$pic)==2,'T2+T4',
+                                  ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,1]==1 & table(df_timepoint$pic)==1,'T2',
+                                         ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,7]==1 & table(df_timepoint$pic)==2,'K+FU',
+                                                ifelse(table(df_timepoint$pic,df_timepoint$timepoint)[,6]==1 & table(df_timepoint$pic)==1,'K','Other'))))))
 
-  pic_participants<-names(table(pic))
-  df_ids<-data.frame(pic_participants,which_timepoints)
-  names(df_ids)<-c('pic','which_timepoints')
+  pic_participants<-names(table(df_timepoint$pic))
+  df_ids<-data.frame(pic=pic_participants,which_timepoints)
+
+  table(df_ids$which_timepoints)
 
   df_trial<-merge(df_trial,df_ids,by='pic',all.x=T) #add which_timepoints to df_trial
   df_ids<-merge(df_ids,df_timepoint[!duplicated(df_timepoint$pic),],by='pic')
@@ -1621,6 +1675,15 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   df_ids<-merge(df_ids,df_ids_et,by='pic')
 
   ###calculate ET change variables (T6-T2)
+
+  df_trial$timepoint<-with(df_trial,ifelse(timepoint==1,'T2',
+                                           ifelse(timepoint==2,'T4',
+                                                  ifelse(timepoint==3,'T6',
+                                                         ifelse(timepoint==4,'FU2',
+                                                                ifelse(timepoint==5,'FU3',
+                                                                       ifelse(timepoint==6,'K',
+                                                                              ifelse(timepoint==7,'K_FU',NA))))))))
+
 
   rja_any_p_T6<-with(df_trial[df_trial$timepoint=='T6',],aggregate(rja_any,by=list(pic), FUN=function(x){table(x)[2]/(table(x)[2]+table(x)[1])}))
   rja_any_p_T2<-with(df_trial[df_trial$timepoint=='T2',],aggregate(rja_any,by=list(pic), FUN=function(x){table(x)[2]/(table(x)[2]+table(x)[1])}))
@@ -1653,9 +1716,6 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
   #-->predict intervention group
   df_ids$pic[df_ids$rja_change_T6T2>0 & df_ids$rpd_change_T6T2>0 & df_ids$gazeduration_change_T6T2>0]
-
-
-
 
   ###--> add ET data to df_timepoint ####
   rja_any_p<-aggregate(df_trial$rja_any,by=list(df_trial$id), FUN=function(x){table(x)[2]/(table(x)[2]+table(x)[1])})
@@ -1706,13 +1766,16 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   descriptives_table_ids<-cbind(row_names,descriptives_table_ids)
   descriptives_table_ids<-ifelse(descriptives_table_ids=='0','<0.001',descriptives_table_ids)
 
+  descriptives_table_ids
+
   require(kableExtra)
   table_sample<-descriptives_table_ids %>%
     kbl(caption = "Sample description",
-        col.names = c('','NTC','ASD (Other)','ASD (T2)','ASD (T2+T4)','ASD (T2+T4+T6)'),
+        col.names = c('','NTC (T2)','NTC (FU)','ASD (Other)','ASD (T2)','ASD (T2+T4)','ASD (T2+T4+T6)','ASD (T2+T4+T6+FU)'),
         row.names = F) %>%
     kable_classic(full_width = F, html_font = "Cambria")
 
+  table_sample
 
   require(ggplot2)
   ggplot(df_ids[df_ids$which_timepoints %in% c('T2','T2+T4','T2+T4+T6'),],aes(y=test_age,x=which_timepoints,fill=which_timepoints))+
@@ -1759,8 +1822,10 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
    stat_summary(fun.data=fun, geom=geom, width=0.2, ...)
  }
 
- ggplot(df_trial[df_trial$pic %in% unique(df_trial$pic[df_trial$timepoint=='T6']),],
-        aes(x=timepoint,y=baseline_pd,group=pic,color=pic))+
+ df_trial$timepoint <- factor(df_trial$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
+ #ggplot(df_trial[df_trial$pic %in% unique(df_trial$pic[df_trial$timepoint=='T6']),],
+ ggplot(df_trial[df_trial$which_timepoints=='T2+T4+T6',])+
+  aes(x=timepoint,y=baseline_pd,group=pic,color=pic)+
    stat_sum_df("mean_cl_normal",geom='point')+
    stat_summary(fun="mean",geom="line")+theme_bw()
 
@@ -1805,10 +1870,18 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
  psych::ICC(rpd[,-1])
 
- ### RJA by age ####
+
+  ### RJA by age ####
+
+ ggplot(df_timepoint,aes(x=age_months_at_date,y=rja_any_p,color=group,fill=group))+geom_smooth(method='lm', formula = y ~ x + poly(x,4))+theme_bw()+
+   labs(x='age (months)',y='RJA likelihood (%)')
+ ggplot(df_timepoint,aes(x=age_months_at_date,y=rja_any_p,color=timepoint))+geom_point()
+
 
  table(df_trial$timepoint)
  table(df_timepoint$age_months,df_timepoint$timepoint)
+
+ with(df_timepoint,by(age_months,timepoint,mean))
 
  #define age at measurement timepoint
  df_trial$age_at_timepoint<-with(df_trial,ifelse(timepoint=='T4',age_months+6,
@@ -1856,7 +1929,7 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
  lmm<-lmer(scale(rpd)~timepoint*
              (scale(time_s)+scale(I(time_s^2))+scale(I(time_s^3))+scale(I(time_s^4))+scale(I(time_s^5))+scale(I(time_s^6)))+ #temporal progression
              condition+stimulus+
-              (1|index_trial)+(1|pic),data=df_jointatt)
+              (1|index_trial)+(1|pic),data=df_jointatt[df_jointatt$timepoint!='FU3',])
  ###--> takes a few minutes
  anova(lmm)
 
@@ -1918,10 +1991,13 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
  ##--> RJA - MAIN FINDING - on per-trial level ####
 
-   lmm<-glmer(rja_any~timepoint+
-                condition+stimulus+
+  df_lmm<-df_trial[df_trial$timepoint!='FU3',]
+  with(df_lmm,table(rja_any,timepoint))
+
+  lmm<-glmer(rja_any~timepoint+
+                #condition+stimulus+
                 scale(no_data)+
-                (1|index_trial)+(1|pic),data=df_trial,family=binomial(link = "logit"))
+                (1|index_trial)+(1|pic),data=df_lmm,family=binomial(link = "logit"))
 
    summary(lmm)
 
@@ -1929,45 +2005,52 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
    qqmath(ranef(lmm)) ##qqplot of trials and PIC
 
 
-   anova(lmm) %>%
+   round(anova(lmm),2) %>%
      kbl(caption = "RJA model") %>%
      kable_classic(full_width = F, html_font = "Cambria")
 
 
-   confint(contrast(emmeans(lmm,~timepoint),'pairwise'))
+   emmeans(lmm,~timepoint)
+
+   confint(emmeans(lmm,~timepoint))
+   contrast(emmeans(lmm,~timepoint),'revpairwise')
 
    #translated to Odd ratio (and ) - T2 vs T6
-   exp(-(confint(contrast(emmeans(lmm,~timepoint),'pairwise'))[5,2]))
-   exp(-(confint(contrast(emmeans(lmm,~timepoint),'pairwise'))[5,5]))
-   exp(-(confint(contrast(emmeans(lmm,~timepoint),'pairwise'))[5,6]))
-   ###--> translated to parcentages in INSAR abstract
+   exp(-(confint(contrast(emmeans(lmm,~timepoint),'pairwise'))[14,2])) #T2 - T6
+   exp(-(confint(contrast(emmeans(lmm,~timepoint),'revpairwise'))[4,2])) #FU2 - T2
+
 
    plot(emmeans(lmm,~timepoint))+theme_bw()
    ###--> control children more joint attention than all ASD groups
    ##--> ASD group improves over time (better joint attention after one year)
 
-
    #create data frame with predicted RJA - log odds
    predicted_loglik_RJA<-predict(lmm)
-   predicted_RJA_mean<-as.numeric(with(df_trial[!is.na(df_trial$no_data),],by(predicted_loglik_RJA,id,mean)))
-   timepoint<-as.factor(with(df_trial[!is.na(df_trial$no_data),],by(timepoint,id,head,n=1)))
-   levels(timepoint)<-c('K','T2','T4','T6')
-   df_plot_predicted_RJA<-data.frame(predicted_RJA_mean,timepoint)
+   predicted_RJA_mean<-as.numeric(with(df_lmm[!is.na(df_lmm$no_data),],by(predicted_loglik_RJA,id,mean)))
+   timepoint<-as.factor(with(df_lmm[!is.na(df_lmm$no_data),],by(timepoint,id,head,n=1)))
+   group<-as.factor(with(df_lmm[!is.na(df_lmm$no_data),],by(group,id,head,n=1)))
+
+   df_plot_predicted_RJA<-data.frame(predicted_RJA_mean,timepoint,group)
 
             #data frame of estimated marginalized means
             emm_data<-data.frame(plot(emmeans(lmm,~timepoint))[[1]])
+            emm_data$timepoint<-factor(emm_data$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
+            emm_data$group<-with(emm_data,ifelse(grepl('K',timepoint),'NTC','ASD'))
+
 
             ggplot(data=emm_data,aes(x=timepoint))+
 
               #add conventional error bars
               geom_errorbar(aes(ymin=asymp.LCL,ymax=asymp.UCL),width=0.2)+
 
+
               #overplot predicted values
               geom_jitter(data=df_plot_predicted_RJA,
                           aes(x=timepoint,
-                              y=predicted_RJA_mean,color=timepoint),alpha=0.8,width =0.4)+
+                              y=predicted_RJA_mean,color=group),alpha=0.8,width =0.4)+
 
-              geom_boxplot(aes(fill=timepoint,
+
+              geom_boxplot(aes(fill=group,
                                middle=the.emmean,
                                lower=the.emmean-1.5*SE,
                                upper=the.emmean+1.5*SE,
@@ -1976,13 +2059,15 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
               #add significance comaprison in figure
               geom_signif(stat="identity",
-                          data=data.frame(x=c(2,2,4), xend=c(4,2,4), y=c(2,2,2), yend=c(2,1.75,1.75), annotation="*"),
+                          data=data.frame(x=c(1,1,3.5,3,3,4), xend=c(3.5,1,3.5,4,3,4), y=c(2,2,2,1.75,1.75,1.75), yend=c(2,1.5,1.75,1.75,1.5,1.5), annotation="*"),
                           aes(x=x,xend=xend, y=y, yend=yend, annotation=annotation))+
 
 
               labs(x='groups',y='RJA likelihood (z)')+
-              theme_bw()+
-              theme(legend.position="none")
+              #scale_fill_discrete(name = "timepoint", labels = c("T2","T4","T6","FU2","K","K_FU"))+
+              scale_x_discrete(limits = c('T2','T4','T6','FU2','K','K_FU'))+ #order x axis
+              theme_bw()
+              #theme(legend.position="none")
 
 
             ggplot(df_timepoint,aes(x=timepoint,y=rja_any_p,color=pic))+geom_point()+geom_line()
@@ -2022,16 +2107,19 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
         ###--> seems like shorter gazes on target and longer gazes on head after therapy
 
         ## RJA early --> in first 4 seconds of video
+        df_lmm<-df_trial[df_trial$timepoint!='FU3',]
         lmm<-glmer(rja_any_early~timepoint+
-                     scale(no_data)+condition+
-                     (1|index_trial)+(1|pic),data=df_trial,family=binomial(link = "logit"))
+                     scale(no_data)+
+                     (1|index_trial)+(1|pic),data=df_lmm,family=binomial(link = "logit"))
         anova(lmm)
         confint(contrast(emmeans(lmm,~timepoint),'pairwise'))
+        exp(-(confint(contrast(emmeans(lmm,~timepoint),'pairwise'))[14,2])) #T2 - T6
+
 
         #RJA late --> after 4 seconds until 7 seconds
         lmm<-glmer(rja_any_late~timepoint+
                      scale(no_data)+condition+
-                     (1|index_trial)+(1|pic),data=df_trial,family=binomial(link = "logit"))
+                     (1|index_trial)+(1|pic),data=df_lmm,family=binomial(link = "logit"))
         anova(lmm)
         confint(contrast(emmeans(lmm,~timepoint),'pairwise'))
         ###--> T6 improves compared to T2 in LATE RJA
@@ -2159,9 +2247,9 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
     anova(lmm)
     ggplot(df_trial,aes(x=condition,y=rpd_early,group=interaction(timepoint,condition),fill=timepoint))+geom_boxplot()
 
-
-    lmm<-lmer(scale(rpd_middle)~timepoint+condition+
-                (1|pic),data=df_trial)
+    df_lmm<-df_trial[df_trial$timepoint!='FU3',]
+    lmm<-lmer(scale(rpd_middle)~timepoint+
+                (1|pic),data=df_lmm)
 
     round(anova(lmm),3) %>%
       kbl(caption = "pupillary response after cueing") %>%
@@ -2319,7 +2407,7 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
 
 
-  lmm<-glmer(rja_any~scale(rpd_middle)+condition+age_months+
+  lmm<-glmer(rja_any~scale(rpd_middle)+age_months_at_date+
                (1|pic),data=df_trial,family=binomial(link = "logit"))
   summary(lmm)
 
@@ -2331,7 +2419,8 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   fixef(lmm)['scale(rpd_middle)']
   confint(lmm,parm='scale(rpd_middle)')
   #--> higher rps associated with higher likelihood of RJA (logOdds)
-  ggplot(df_ids,aes(rpd_middle,rja_any_p))+geom_point()+geom_point(aes(color=group))+geom_smooth(color='grey',method='lm')+theme_bw()
+  ggplot(df_ids,aes(rpd_middle,rja_any_p))+geom_point()+geom_point(aes(color=group))+geom_smooth(color='grey',method='lm')+theme_bw()+
+    labs(x='pupillary response (z)',y='RJA likelihood (z)')
 
 
   lmm<-glmer(rja_any~scale(rpd_early)+timepoint+condition+
