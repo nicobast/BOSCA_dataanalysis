@@ -1286,9 +1286,13 @@ ggplot(df_jointatt[df_jointatt$ts_event>1000 & df_jointatt$ts_event<1100,],aes(x
       #TODO: animate gaze behavior
       require(gganimate)
       require(gifski) #gif renderer - animate()
+      #transition variable in animation:
       frame_rate<-300
       df_jointatt$time_s<-with(df_jointatt,round(ts_event/frame_rate,1))
 
+
+
+      #BETWEEN GROUPS
       animated_gaze<-ggplot(df_jointatt,aes(x=gazepos_x,y=gazepos_y))+
         stat_density_2d(aes(fill = ..density..), n=50, geom = "raster", contour = FALSE) +
         #geom_bin_2d(bins=100)+
@@ -1306,6 +1310,27 @@ ggplot(df_jointatt[df_jointatt$ts_event>1000 & df_jointatt$ts_event<1100,],aes(x
 
       gif_1<-animate(animated_gaze, duration = 10, fps = 10, width = 800, height = 800, renderer = gifski_renderer())
       anim_save(file=paste0(home_path,project_path,'/output/gaze_animation_time_2ddensity.gif'),gif_1)
+
+      hist(df_jointatt$time_s)
+      #ACROSS GROUPS
+      animated_gaze<-ggplot(df_jointatt[df_jointatt$time_s>9 & df_jointatt$time_s<11,],aes(x=gazepos_x,y=gazepos_y))+
+        stat_density_2d(aes(fill = ..density..), n=50, geom = "raster", contour = FALSE) +
+        #geom_bin_2d(bins=100)+
+        #scale_fill_gradientn(colours=rev(rainbow(3)))+
+        scale_fill_gradientn(colours = c("black","white","red","orange","yellow","green","blue"),
+                             values = c(1.0,0.5,0.2,0.15,0.1,0.05,0))+
+        ylim(1,0)+xlim(0,1)+coord_fixed(ratio = 9/16)+
+        #facet_wrap(~timepoint)+
+        theme_bw()+
+        theme(legend.position="none")+
+        #animation specific
+        #transition_time(time_s)+facet_wrap(~timepoint)
+        transition_time(time_s)+
+        ggtitle('Gaze behavior between groups','time: {frame_time}')
+
+      gif_1<-animate(animated_gaze, duration = 10, fps = 10, width = 800, height = 800, renderer = gifski_renderer())
+      anim_save(file=paste0(home_path,project_path,'/output/gaze_animation_las2s.gif'),gif_1)
+
 
 ### --> visualize RJA ####
 
@@ -2165,9 +2190,10 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
 
 
-        ### --> other measures ####
-    lmm<-lmer(gazeduration_head~timepoint*condition+
-                scale(no_data)+(1|pic),data=df_trial)
+        ### --> other measures (e.g.: social attention) ####
+      df_lmm<-df_trial[df_trial$timepoint!='FU3',]
+      lmm<-lmer(gazeduration_head~timepoint*condition+
+                scale(no_data)+(1|pic),data=df_lmm)
 
         round(anova(lmm),3)%>%
           kbl(caption = "gaze duration head") %>%
@@ -2190,7 +2216,7 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
 
 
     lmm<-lmer(gazeduration_headafter~timepoint*condition+
-                scale(no_data)+(1|pic),data=df_trial)
+                scale(no_data)+(1|pic),data=df_lmm)
     anova(lmm)
     plot(contrast(emmeans(lmm,~timepoint),'eff'))
     plot(contrast(emmeans(lmm,~condition),'eff'))
@@ -2420,7 +2446,7 @@ save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/al
   confint(lmm,parm='scale(rpd_middle)')
   #--> higher rps associated with higher likelihood of RJA (logOdds)
   ggplot(df_ids,aes(rpd_middle,rja_any_p))+geom_point()+geom_point(aes(color=group))+geom_smooth(color='grey',method='lm')+theme_bw()+
-    labs(x='pupillary response (z)',y='RJA likelihood (z)')
+    labs(x='pupillary response (z)',y='RJA likelihood')
 
 
   lmm<-glmer(rja_any~scale(rpd_early)+timepoint+condition+
