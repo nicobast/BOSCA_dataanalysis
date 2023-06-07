@@ -17,6 +17,8 @@
 
 # SETUP ####
 
+#added something fancy
+
 #check for OS --> define home path (script independent of OS)
 ifelse(Sys.info()['sysname']=='Linux',
        home_path<-'~',
