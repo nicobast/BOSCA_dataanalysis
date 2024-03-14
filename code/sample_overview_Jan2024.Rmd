@@ -12,72 +12,55 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 #required packages
 require(dplyr)
-require(openxlsx)
 require(RColorBrewer)
 require(ggplot2)
 require(kableExtra)
 require(gridExtra)
+require(readxl)
 
 #set theme
 theme_set(theme_bw())
 
 #data_path
-datapath<-'C:/Users/nico/PowerFolders/data_AFFIP/database_exports/2023_05_withoutFU/'
+datapath<-'C:/Users/nico/PowerFolders/data_AFFIP/database_exports/2023_07/'
 savepath<-'C:/Users/nico/PowerFolders/data_AFFIP/'
 eyetracking_dataquality_file<-"C:/Users/nico/PowerFolders/data_AFFIP/data/Quality sheet/AFFIPeyetracking_quality.xlsx"
 
 ```
 
-## prepare database entries
-
-Load different data base output files (May 2023)
+Load checklist as master merge file (July 2023 - all included)
 
 ```{r prepare database output}
 
 list.files(datapath)
 
 ##LOAD checklist####
-checklist<-read.xlsx(paste0(datapath,'Checkliste.xlsx'))
+checklist<-read.csv2(paste0(datapath,'Checkliste.csv'))
 checklist <- checklist[order(checklist$ID_Studie),]
-checklist <- select(checklist, ID_Bado, ID_Studie, Geschlecht_Index)
+#checklist <- select(checklist, ID_Bado, ID_Studie, Geschlecht_Index)
 names(checklist)[names(checklist) == "ID_Studie"] <- "id" #rename id (in order to merge later with eye-tracking data)
-
-##LOAD ADOS####
-ADOS_M1 <- read.xlsx(paste0(datapath,'ADOS_2_M1_G_WPS.xlsx'))
-ADOS_M1 <- ADOS_M1[!ADOS_M1$Meßzeit_ADOS_2_M1!="T1",] #exlcude other testzeitpunkte
-ADOS_M1 <- ADOS_M1[!ADOS_M1$rating!=1,] #exclude video coding
-ADOS_M1 <- select(ADOS_M1, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
-names(ADOS_M1) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
-ADOS_M1$module <- "1"
-
-ADOS_M2 <- read.xlsx(paste0(datapath,'ADOS_2_M2_WPS.xlsx'))
-ADOS_M2 <- ADOS_M2[!ADOS_M2$Meßzeit_ADOS_2_M2!="T1",] #exclude other testzeitpunkte 
-ADOS_M2 <- ADOS_M2[!ADOS_M2$rating!=1,] #exclude video coding
-ADOS_M2 <- select(ADOS_M2, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
-names(ADOS_M2) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
-ADOS_M2$module <- "2"
-ADOS <- rbind(ADOS_M1, ADOS_M2)
-
-##LOAD Bayley/WPPSI####
-#WPPSI:
-wppsi3 <- read.xlsx(paste0(datapath,'WPPSI_3_0_3_11.xlsx'))
-wppsi3 <- wppsi3[!wppsi3$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
-wppsi3 <- select(wppsi3, ID_Bado, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW)
-wppsi3$Matrizen_Test_RW <- NA
-wppsi3$test <- "klein"
-
-wppsi4 <- read.xlsx(paste0(datapath,'WPPSI_4_0_7_2.xlsx'))
-wppsi4 <- wppsi4[!wppsi4$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
-wppsi4 <- select(wppsi4, ID_Bado, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW, Matrizen_Test_RW)
-wppsi4$test <- "gross"
-
-wppsi <- rbind(wppsi3, wppsi4)
 
 ```
 
 calculate test age based on WPPSI or Bayley measures
 
 ```{r calculate test age}
+
+##LOAD Bayley/WPPSI####
+#WPPSI:
+wppsi3 <- read.csv2(paste0(datapath,'WPPSI_3_0_3_11.csv'))
+#wppsi3 <- wppsi3[!wppsi3$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi3 <- select(wppsi3, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW)
+wppsi3$Matrizen_Test_RW <- NA
+wppsi3$test <- "klein"
+
+wppsi4 <- read.csv2(paste0(datapath,'WPPSI_4_0_7_2.csv'))
+#wppsi4 <- wppsi4[!wppsi4$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi4 <- select(wppsi4, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW, Matrizen_Test_RW)
+wppsi4$test <- "gross"
+
+wppsi <- rbind(wppsi3, wppsi4)
+
 
 # testage calculation in months
 # data.frame based on WPPSI table
@@ -123,17 +106,19 @@ wppsi$ta_mean <- ifelse(wppsi$test == "klein",
                         rowMeans(wppsi[c("ta_mt", "ta_fl", "ta_mz")], na.rm = TRUE))
 
 
-wppsi <- select(wppsi, ID_Bado, Handlungsteil_IQ, ta_mean)
-names(wppsi) <- c("ID_Bado", "IQ", "test_age")
+wppsi <- select(wppsi, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, ta_mean)
+names(wppsi) <- c("ID_Bado", "t","IQ", "test_age")
 
 #BAYLEY:
-bayley <- read.xlsx(paste0(datapath,'Bayley III.xlsx'))
-bayley <- bayley[!bayley$Meßzeit_BayleyIII!="T1",] #exlcude other testzeitpunkte
-bayley <- select(bayley, ID_Bado, Kog_RW, Kog_EA)
-names(bayley) <- c("ID_Bado", "IQ", "test_age")
+bayley <- read.csv2(paste0(datapath,'Bayley III.csv'),fileEncoding='Latin1')
+#bayley <- bayley[!bayley$Meßzeit_BayleyIII!="T1",] #exlcude other testzeitpunkte
+bayley <- select(bayley, ID_Bado, Meßzeit_BayleyIII, Kog_RW, Kog_EA)
+names(bayley) <- c("ID_Bado", "t","IQ", "test_age")
 
 #get one data frame for cognitive ability
 cog_abil <- rbind(bayley, wppsi)
+names(cog_abil)[2]<-'t_IQ'
+
 # #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
 # cog_abil$ID_Bado[duplicated(cog_abil$ID_Bado)==T] 
 cog_abil <- cog_abil[!is.na(cog_abil$test_age),] #delete NAs (wenn nur bayley sprache eingegeben, mÃ¼sste bayley EA kognitiv=NA sein)
@@ -147,54 +132,79 @@ define age
 
 #DEFINE AGE###
 #read wppsi3 
-wppsi3.age <- read.xlsx(paste0(datapath,'WPPSI_3_0_3_11.xlsx'))
-wppsi3.age <- wppsi3.age[!wppsi3.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
-wppsi3.age <- select(wppsi3.age, ID_Bado, WPPSI_3_Alt_Monat)
-names(wppsi3.age) <- c("ID_Bado", "age_months")
+wppsi3.age <- read.csv2(paste0(datapath,'WPPSI_3_0_3_11.csv'))
+#wppsi3.age <- wppsi3.age[!wppsi3.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi3.age <- select(wppsi3.age, ID_Bado, Messzeitpunkt, WPPSI_3_Alt_Monat)
+names(wppsi3.age) <- c("ID_Bado", "t","age_months")
 #read wppsi4
-wppsi4.age <- read.xlsx(paste0(datapath,'WPPSI_4_0_7_2.xlsx'))
-wppsi4.age <- wppsi4.age[!wppsi4.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
-wppsi4.age <- select(wppsi4.age, ID_Bado, WPPSI_4_Alt_Monat)
-names(wppsi4.age) <- c("ID_Bado", "age_months")
+wppsi4.age <- read.csv2(paste0(datapath,'WPPSI_4_0_7_2.csv'))
+#wppsi4.age <- wppsi4.age[!wppsi4.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi4.age <- select(wppsi4.age, ID_Bado, Messzeitpunkt, WPPSI_4_Alt_Monat)
+names(wppsi4.age) <- c("ID_Bado", "t","age_months")
 #read bayley
-bayley.age <- read.xlsx(paste0(datapath,'Bayley III.xlsx'))
-bayley.age <- select(bayley.age, ID_Bado, Bayley_Alt_Monat, Kog_EA)
+bayley.age <- read.csv2(paste0(datapath,'Bayley III.csv'),fileEncoding='Latin1')
+bayley.age <- select(bayley.age, ID_Bado, Meßzeit_BayleyIII, Bayley_Alt_Monat, Kog_EA)
 bayley.age <- bayley.age[!is.na(bayley.age$Kog_EA),] #delete NAs (wenn nur bayley sprache eingegeben, mÃ¼sste bayley EA kognitiv=NA sein)
 bayley.age <- bayley.age[ , ! names(bayley.age) %in% "Kog_EA"]
-names(bayley.age) <- c("ID_Bado", "age_months")
+names(bayley.age) <- c("ID_Bado", "t","age_months")
 
 age <- rbind(wppsi3.age, wppsi4.age, bayley.age)
-#age$ID_Bado[duplicated(age$ID_Bado)==T] #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
+
+  # age$ID_Bado[duplicated(age$ID_Bado)==T] 
+  # #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
 
 ```
 
-load symptom measures (BOSCC, CBCL, ADI)
+load ADOS data - combine data of different modules
 
-```{r load symptom severity}
+```{r ados}
+##LOAD ADOS####
+ADOS_M1 <- read.csv2(paste0(datapath,'ADOS_2_M1_G_WPS.csv'),fileEncoding="Latin1")
+#ADOS_M1 <- ADOS_M1[!ADOS_M1$Meßzeit_ADOS_2_M1!="T1",] #exlcude other testzeitpunkte
+ADOS_M1 <- ADOS_M1[!ADOS_M1$rating!=1,] #exclude video coding
+ADOS_M1 <- select(ADOS_M1, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M1) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
+ADOS_M1$module <- "1"
+
+ADOS_M2 <- read.csv2(paste0(datapath,'ADOS_2_M2_WPS.csv'),fileEncoding='Latin1')
+#ADOS_M2 <- ADOS_M2[!ADOS_M2$Meßzeit_ADOS_2_M2!="T1",] #exclude other testzeitpunkte 
+ADOS_M2 <- ADOS_M2[!ADOS_M2$rating!=1,] #exclude video coding
+ADOS_M2 <- select(ADOS_M2, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M2) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
+ADOS_M2$module <- "2"
+ADOS <- rbind(ADOS_M1, ADOS_M2)
+
+```
+
+load measures (BOSCC, CBCL, SRS, ADI)
+
+```{r load measures}
 
 ####LOAD BOSCC###
-BOSCC <- read.xlsx(paste0(datapath,'BOSCC.xlsx'))
-BOSCC <- BOSCC[!BOSCC$Meßzeit_BOSCC!="T2",] #exlcude other testzeitpunkte
-BOSCC <- select(BOSCC, ID_Bado, BOSCC_Average_Total, BOSCC_SA, BOSCC_RRB)
+BOSCC <- read.csv2(paste0(datapath,'BOSCC.csv'),fileEncoding='Latin1')
+BOSCC <- select(BOSCC, ID_Bado, Meßzeit_BOSCC, BOSCC_Average_Total, BOSCC_SA, BOSCC_RRB)
+names(BOSCC)<-c('ID_Bado','t','BOSCC_Average_Total','BOSCC_SA','BOSCC_RRB')
 
 ####LOAD CBCL###
-cbcl <- read.xlsx(paste0(datapath,'CBCL1_5_5.xlsx'))
-cbcl <- select(cbcl, ID_Bado, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+cbcl <- read.csv2(paste0(datapath,'CBCL_1_5_5.csv'),fileEncoding='Latin1')
+cbcl <- select(cbcl, ID_Bado, Meßzeit_CBCLV, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+names(cbcl)[2]<-'t'
 
 ####LOAD SRS####
-srs <- read.xlsx(paste0(datapath,'SRS.xlsx'))
+srs <- read.csv2(paste0(datapath,'SRS.csv'),fileEncoding='Latin1')
 srs <- srs[!srs$Beurteiler=="Erzieher/innen",]
 srs$srs.interp.rw <- round(srs$Gesamtwert_N_k_RW*65/16)
-srs <- select(srs, ID_Bado, srs.interp.rw, Gesamtwert_N_k_RW)
-names(srs)<-c("ID_Bado", "srs.interp.rw", "srs_sum")
+srs <- select(srs, Meßzeit_SRS, ID_Bado, srs.interp.rw, Gesamtwert_N_k_RW)
+names(srs)<-c("ID_Bado", 't',"srs.interp.rw", "srs_sum")
 
 ####LOAD RBS-R####
-rbs <- read.xlsx(paste0(datapath,'RBSR.xlsx'))
+rbs <- read.csv2(paste0(datapath,'RBS.csv'),fileEncoding='Latin1')
 rbs <- rbs[!rbs$Beurteiler=="Erzieher/innen",]
-rbs <- select(rbs, ID_Bado, RBSR_ges)
+rbs <- select(rbs, ID_Bado,Meßzeit_RBS,  RBSR_ges)
+names(rbs)[2]<-'t'
 
 ##LOAD ADI####
-ADI <- read.xlsx(paste0(datapath,'ADI-R.xlsx'))
+ADI <- read.csv2(paste0(datapath,'ADI-R.csv'),fileEncoding='Latin1')
 ADI$adi.sum.algo <- ADI$ADI_alg_SOZ_INT+ADI$ADI_alg_KOM+ADI$ADI_alg_RITUALE
 ADI$adi.sum.toddler <- ADI$ADI_Toddler_ges
 ADI$adi.sum.algo[ADI$adi.sum.toddler>1]<-NA
@@ -202,20 +212,31 @@ ADI <- select(ADI, ID_Bado, adi.sum.algo, adi.sum.toddler)
 
 ```
 
-define group, merge and save to file
+merge data
 
 ```{r  merge and save to file}
 
 #create main data frame
 demogr <- merge(checklist,ADOS,by="ID_Bado", all.x=T)
-demogr <- merge(demogr, BOSCC, by="ID_Bado", all.x=T)
-demogr <- merge(demogr, cog_abil, by="ID_Bado", all.x=T)
-demogr <- merge(demogr, cbcl, by="ID_Bado", all.x=T)
-demogr <- merge(demogr, srs, by="ID_Bado", all.x=T)
-demogr <- merge(demogr, rbs, by="ID_Bado", all.x=T)
-demogr <- merge(demogr, age, by="ID_Bado", all.x=T)
 demogr <- merge(demogr, ADI, by="ID_Bado", all.x=T)
-demogr <- demogr[order(demogr$"id"),]
+demogr <- merge(demogr, BOSCC, by="ID_Bado", all.x=T)
+
+demogr <- merge(demogr, cbcl, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, srs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, rbs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, age, by=c("ID_Bado","t"), all.x=T)
+
+
+demogr <- merge(demogr, cog_abil, by="ID_Bado", all.x=T)
+###--> cognitive abilit yis measured at different timepoints, see 't_IQ' variable
+
+demogr <- demogr[order(demogr$"id",demogr$"t"),]
+
+```
+
+define group and save to file
+
+```{r save to file}
 
 ## define group and save to files
 demogr$group <- "ASD"
@@ -231,7 +252,9 @@ save(demogr, file=paste0(savepath,'demogr_total_baseline_0623.Rdata'))
 # srs$ID_Bado[duplicated(srs$ID_Bado)==T]
 # rbs$ID_Bado[duplicated(rbs$ID_Bado)==T]
 # ADI$ID_Bado[duplicated(ADI$ID_Bado)==T]
+
 ```
+
 
 ## assess eye-tracking data quality
 
@@ -241,7 +264,9 @@ load eye tracking data quality and merge to data base entries
 
 ###--> CHECK corresponding ET data ####
 
-et_demogr<-read.xlsx(eyetracking_dataquality_file,detectDates = T)
+#et_demogr<-read.csv(eyetracking_dataquality_file,detectDates = T)
+et_demogr<-read_xlsx(eyetracking_dataquality_file)
+
 et_demogr<-et_demogr[,1:8]
 
 #fix false entry
@@ -250,6 +275,8 @@ et_demogr$date[221]<-'2022-04-01'
 #translate calibration to factor
 # table(et_demogr$quality.of.calibration)
 # table(grepl('good',et_demogr$quality.of.calibration))
+
+et_demogr$quality.of.calibration<-et_demogr$`quality of calibration`
 
 calib_quality<-rep(NA,nrow(et_demogr))
 calib_quality<-with(et_demogr,ifelse(grepl('good',quality.of.calibration),'good',calib_quality))
@@ -269,7 +296,9 @@ et_demogr<-data.frame(et_demogr,calib_quality)
 et_demogr$calib_quality<-factor(et_demogr$calib_quality,levels=c('good','medium','bad','failed','else'))
 
 ####--> merge database entries to ET data ####
-et_demogr<-merge(et_demogr,demogr,by.x='ID',by.y='id')
+#TODO: fix multiple lines
+#et_demogr<-merge(et_demogr,demogr,by.x='ID',by.y='id')
+
 
 ```
 

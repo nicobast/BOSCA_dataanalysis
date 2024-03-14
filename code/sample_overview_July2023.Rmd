@@ -1,0 +1,485 @@
+---
+title: "Eye-tracking data in A-FFIP (BOSCA battery)"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-06-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+#required packages
+require(dplyr)
+require(RColorBrewer)
+require(ggplot2)
+require(kableExtra)
+require(gridExtra)
+
+#set theme
+theme_set(theme_bw())
+
+#data_path
+datapath<-'C:/Users/nico/PowerFolders/data_AFFIP/database_exports/2023_07/'
+savepath<-'C:/Users/nico/PowerFolders/data_AFFIP/'
+eyetracking_dataquality_file<-"C:/Users/nico/PowerFolders/data_AFFIP/data/Quality sheet/AFFIPeyetracking_quality.xlsx"
+
+```
+
+Load checklist as master merge file (July 2023 - all included)
+
+```{r prepare database output}
+
+list.files(datapath)
+
+##LOAD checklist####
+checklist<-read.csv2(paste0(datapath,'Checkliste.csv'))
+checklist <- checklist[order(checklist$ID_Studie),]
+#checklist <- select(checklist, ID_Bado, ID_Studie, Geschlecht_Index)
+names(checklist)[names(checklist) == "ID_Studie"] <- "id" #rename id (in order to merge later with eye-tracking data)
+
+```
+
+calculate test age based on WPPSI or Bayley measures
+
+```{r calculate test age}
+
+##LOAD Bayley/WPPSI####
+#WPPSI:
+wppsi3 <- read.csv2(paste0(datapath,'WPPSI_3_0_3_11.csv'))
+#wppsi3 <- wppsi3[!wppsi3$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi3 <- select(wppsi3, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW)
+wppsi3$Matrizen_Test_RW <- NA
+wppsi3$test <- "klein"
+
+wppsi4 <- read.csv2(paste0(datapath,'WPPSI_4_0_7_2.csv'))
+#wppsi4 <- wppsi4[!wppsi4$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi4 <- select(wppsi4, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, Mosaik_Test_RW, Figuren_legen_RW, Matrizen_Test_RW)
+wppsi4$test <- "gross"
+
+wppsi <- rbind(wppsi3, wppsi4)
+
+
+# testage calculation in months
+# data.frame based on WPPSI table
+ta_ym <- data.frame(jahre = c(rep(3, 5), # 5 entries with 3 years and so on
+                              rep(4, 4), 
+                              rep(5, 4), 
+                              rep(6,4), 
+                              rep(7, 2)
+), 
+monate = c(0, # untere Grenze: 3 Jahre + 0 Monate
+           rep(c(1, 4, 7, 10), 4), 
+           1, 
+           2 # obere Grenze: 7 Jahre + 2 Monate
+)
+)
+
+# translate to months
+ta_aeq <- ta_ym$jahre * 12 + ta_ym$monate
+
+#maximum values of raw scores in subtests for each test age equivalence groups
+mt_cuts <- c(0, 15, 17, 19, 20, 22, 24, 25, 27, 28, 30:38, 46)
+fl_cuts <- c(0, 7, 11, 17, 22, 25, 30, 34, 38, 42, 45, 48, 51, 54, 56:58, 60, 62, 72)
+mz_cuts <- c(0, seq(0.1, 0.6, .1), 5, 5.1, 6, 6.1, 7, 7.1, 8, 8.1, 9, 9.1, 10, 11, 17)
+    # Da bei mz_cuts nicht alle TA-ÃÂquivalenzwerte Rohwert-Entsprechungen haben 
+    # (bspw. erst eine Entsprechung ab einer Rohwertsumme von 5 und dann nur ganzzahlig bis 17)
+    # werden zwischen den Kategorien FÃÂ¼ller-Werte (Nachkommastellen) eingetragen.
+    # Damit die Zuordnung funktioniert, muss fÃÂ¼r jeden TA-ÃÂquivalenzwert ein Maximalwert existieren.
+
+# RELATE raw score to test age
+    # Die cut-Funktion ordnet jeden Wert anhand des "breaks" Parameters in das zugehÃÂ¶rige 
+    # Intervall mit dem "label" des entsprechenden TA-ÃÂquivalents ein
+wppsi$ta_mt <- cut(wppsi$Mosaik_Test_RW, breaks = mt_cuts, labels = ta_aeq)
+wppsi$ta_fl <- cut(wppsi$Figuren_legen_RW, breaks = fl_cuts, labels = ta_aeq)
+wppsi$ta_mz <- cut(wppsi$Matrizen_Test_RW, breaks = mz_cuts, labels = ta_aeq)
+
+wppsi$ta_mt <- as.numeric(as.character(wppsi$ta_mt))
+wppsi$ta_fl <- as.numeric(as.character(wppsi$ta_fl))
+wppsi$ta_mz <- as.numeric(as.character(wppsi$ta_mz))
+
+# calculate mean score
+wppsi$ta_mean <- ifelse(wppsi$test == "klein", 
+                        rowMeans(wppsi[c("ta_mt", "ta_fl")], na.rm = TRUE), 
+                        rowMeans(wppsi[c("ta_mt", "ta_fl", "ta_mz")], na.rm = TRUE))
+
+
+wppsi <- select(wppsi, ID_Bado, Messzeitpunkt, Handlungsteil_IQ, ta_mean)
+names(wppsi) <- c("ID_Bado", "t","IQ", "test_age")
+
+#BAYLEY:
+bayley <- read.csv2(paste0(datapath,'Bayley III.csv'),fileEncoding='Latin1')
+#bayley <- bayley[!bayley$Meßzeit_BayleyIII!="T1",] #exlcude other testzeitpunkte
+bayley <- select(bayley, ID_Bado, Meßzeit_BayleyIII, Kog_RW, Kog_EA)
+names(bayley) <- c("ID_Bado", "t","IQ", "test_age")
+
+#get one data frame for cognitive ability
+cog_abil <- rbind(bayley, wppsi)
+names(cog_abil)[2]<-'t_IQ'
+
+# #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
+# cog_abil$ID_Bado[duplicated(cog_abil$ID_Bado)==T] 
+cog_abil <- cog_abil[!is.na(cog_abil$test_age),] #delete NAs (wenn nur bayley sprache eingegeben, mÃ¼sste bayley EA kognitiv=NA sein)
+
+
+```
+
+define age
+
+```{r define age}
+
+#DEFINE AGE###
+#read wppsi3 
+wppsi3.age <- read.csv2(paste0(datapath,'WPPSI_3_0_3_11.csv'))
+#wppsi3.age <- wppsi3.age[!wppsi3.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi3.age <- select(wppsi3.age, ID_Bado, Messzeitpunkt, WPPSI_3_Alt_Monat)
+names(wppsi3.age) <- c("ID_Bado", "t","age_months")
+#read wppsi4
+wppsi4.age <- read.csv2(paste0(datapath,'WPPSI_4_0_7_2.csv'))
+#wppsi4.age <- wppsi4.age[!wppsi4.age$Messzeitpunkt!="T1",] #exlcude other testzeitpunkte
+wppsi4.age <- select(wppsi4.age, ID_Bado, Messzeitpunkt, WPPSI_4_Alt_Monat)
+names(wppsi4.age) <- c("ID_Bado", "t","age_months")
+#read bayley
+bayley.age <- read.csv2(paste0(datapath,'Bayley III.csv'),fileEncoding='Latin1')
+bayley.age <- select(bayley.age, ID_Bado, Meßzeit_BayleyIII, Bayley_Alt_Monat, Kog_EA)
+bayley.age <- bayley.age[!is.na(bayley.age$Kog_EA),] #delete NAs (wenn nur bayley sprache eingegeben, mÃ¼sste bayley EA kognitiv=NA sein)
+bayley.age <- bayley.age[ , ! names(bayley.age) %in% "Kog_EA"]
+names(bayley.age) <- c("ID_Bado", "t","age_months")
+
+age <- rbind(wppsi3.age, wppsi4.age, bayley.age)
+
+  # age$ID_Bado[duplicated(age$ID_Bado)==T] 
+  # #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
+
+```
+
+load ADOS data - combine data of different modules
+
+```{r ados}
+##LOAD ADOS####
+ADOS_M1 <- read.csv2(paste0(datapath,'ADOS_2_M1_G_WPS.csv'),fileEncoding="Latin1")
+#ADOS_M1 <- ADOS_M1[!ADOS_M1$Meßzeit_ADOS_2_M1!="T1",] #exlcude other testzeitpunkte
+ADOS_M1 <- ADOS_M1[!ADOS_M1$rating!=1,] #exclude video coding
+ADOS_M1 <- select(ADOS_M1, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M1) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
+ADOS_M1$module <- "1"
+
+ADOS_M2 <- read.csv2(paste0(datapath,'ADOS_2_M2_WPS.csv'),fileEncoding='Latin1')
+#ADOS_M2 <- ADOS_M2[!ADOS_M2$Meßzeit_ADOS_2_M2!="T1",] #exclude other testzeitpunkte 
+ADOS_M2 <- ADOS_M2[!ADOS_M2$rating!=1,] #exclude video coding
+ADOS_M2 <- select(ADOS_M2, ID_Bado, Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M2) <- c("ID_Bado", "Severity_SA", "Severity_RRB", "Severity_Gesamt")
+ADOS_M2$module <- "2"
+ADOS <- rbind(ADOS_M1, ADOS_M2)
+
+```
+
+load measures (BOSCC, CBCL, SRS, ADI)
+
+```{r load measures}
+
+####LOAD BOSCC###
+BOSCC <- read.csv2(paste0(datapath,'BOSCC.csv'),fileEncoding='Latin1')
+BOSCC <- select(BOSCC, ID_Bado, Meßzeit_BOSCC, BOSCC_Average_Total, BOSCC_SA, BOSCC_RRB)
+names(BOSCC)<-c('ID_Bado','t','BOSCC_Average_Total','BOSCC_SA','BOSCC_RRB')
+
+####LOAD CBCL###
+cbcl <- read.csv2(paste0(datapath,'CBCL_1_5_5.csv'),fileEncoding='Latin1')
+cbcl <- select(cbcl, ID_Bado, Meßzeit_CBCLV, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+names(cbcl)[2]<-'t'
+
+####LOAD SRS####
+srs <- read.csv2(paste0(datapath,'SRS.csv'),fileEncoding='Latin1')
+srs <- srs[!srs$Beurteiler=="Erzieher/innen",]
+srs$srs.interp.rw <- round(srs$Gesamtwert_N_k_RW*65/16)
+srs <- select(srs, Meßzeit_SRS, ID_Bado, srs.interp.rw, Gesamtwert_N_k_RW)
+names(srs)<-c("ID_Bado", 't',"srs.interp.rw", "srs_sum")
+
+####LOAD RBS-R####
+rbs <- read.csv2(paste0(datapath,'RBS.csv'),fileEncoding='Latin1')
+rbs <- rbs[!rbs$Beurteiler=="Erzieher/innen",]
+rbs <- select(rbs, ID_Bado,Meßzeit_RBS,  RBSR_ges)
+names(rbs)[2]<-'t'
+
+##LOAD ADI####
+ADI <- read.csv2(paste0(datapath,'ADI-R.csv'),fileEncoding='Latin1')
+ADI$adi.sum.algo <- ADI$ADI_alg_SOZ_INT+ADI$ADI_alg_KOM+ADI$ADI_alg_RITUALE
+ADI$adi.sum.toddler <- ADI$ADI_Toddler_ges
+ADI$adi.sum.algo[ADI$adi.sum.toddler>1]<-NA
+ADI <- select(ADI, ID_Bado, adi.sum.algo, adi.sum.toddler)
+
+```
+
+merge data
+
+```{r  merge and save to file}
+
+#create main data frame
+demogr <- merge(checklist,ADOS,by="ID_Bado", all.x=T)
+demogr <- merge(demogr, ADI, by="ID_Bado", all.x=T)
+demogr <- merge(demogr, BOSCC, by="ID_Bado", all.x=T)
+
+demogr <- merge(demogr, cbcl, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, srs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, rbs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, age, by=c("ID_Bado","t"), all.x=T)
+
+
+demogr <- merge(demogr, cog_abil, by="ID_Bado", all.x=T)
+###--> cognitive abilit yis measured at different timepoints, see 't_IQ' variable
+
+demogr <- demogr[order(demogr$"id",demogr$"t"),]
+
+```
+
+define group and save to file
+
+```{r save to file}
+
+## define group and save to files
+demogr$group <- "ASD"
+demogr$group[grep("_K",demogr$id)]<-"TD"
+
+save(demogr, file=paste0(savepath,'demogr_total_baseline_0623.Rdata'))
+
+#check if there are duplicates in participants
+# ADOS$ID_Bado[duplicated(ADOS$ID_Bado)==T]
+# BOSCC$ID_Bado[duplicated(BOSCC$ID_Bado)==T]
+# cog_abil$ID_Bado[duplicated(cog_abil$ID_Bado)==T]
+# cbcl$ID_Bado[duplicated(cbcl$ID_Bado)==T]
+# srs$ID_Bado[duplicated(srs$ID_Bado)==T]
+# rbs$ID_Bado[duplicated(rbs$ID_Bado)==T]
+# ADI$ID_Bado[duplicated(ADI$ID_Bado)==T]
+
+```
+
+
+## assess eye-tracking data quality
+
+load eye tracking data quality and merge to data base entries
+
+```{r prepare eye tracking meta data}
+
+###--> CHECK corresponding ET data ####
+
+#et_demogr<-read.csv(eyetracking_dataquality_file,detectDates = T)
+
+  require(readxl)
+  et_demogr<-read_xlsx(eyetracking_dataquality_file)
+
+et_demogr<-et_demogr[,1:8]
+
+#fix false entry
+et_demogr$date[221]<-'2022-04-01'
+
+#translate calibration to factor
+# table(et_demogr$quality.of.calibration)
+# table(grepl('good',et_demogr$quality.of.calibration))
+
+et_demogr$quality.of.calibration<-et_demogr$`quality of calibration`
+
+calib_quality<-rep(NA,nrow(et_demogr))
+calib_quality<-with(et_demogr,ifelse(grepl('good',quality.of.calibration),'good',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('ok',quality.of.calibration),'good',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('moderate',quality.of.calibration),'medium',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('medium',quality.of.calibration),'medium',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('bad',quality.of.calibration),'bad',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('low',quality.of.calibration),'bad',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('failed',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('no calibration',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('not possible',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(is.na(calib_quality),'else',calib_quality))
+
+et_demogr<-data.frame(et_demogr,calib_quality)
+
+#reorder levels
+et_demogr$calib_quality<-factor(et_demogr$calib_quality,levels=c('good','medium','bad','failed','else'))
+
+####--> merge database entries to ET data ####
+#TODO: fix multiple lines
+et_demogr<-merge(et_demogr,demogr,by.x='ID',by.y='id')
+
+
+```
+
+refine timepoint variable
+
+```{r timepoint variable}
+
+timepoint<-rep(NA,nrow(et_demogr))
+timepoint<-ifelse(grepl('line',et_demogr$Testzeitpunkt),'K',et_demogr$Testzeitpunkt)
+timepoint<-ifelse(timepoint=='T1','T2',timepoint)
+timepoint<-ifelse(timepoint=='fu','K_FU',timepoint)
+timepoint<-ifelse(timepoint=='fu2','FU2',timepoint)
+timepoint<-ifelse(timepoint=='fu3','FU3',timepoint)
+et_demogr<-data.frame(et_demogr,timepoint)
+
+##reorder factor
+et_demogr$timepoint<-factor(et_demogr$timepoint,levels=c('T2','T4','T6','FU2','FU3','K','K_FU'))
+
+#create üic variable
+et_demogr$pic<-droplevels(interaction(et_demogr$ID,et_demogr$timepoint))
+  
+
+```
+
+basic data quality measures
+
+```{r define basic data quality}
+
+#database entries that have ET data
+t(table(demogr$id %in% et_demogr$ID)) %>%
+  kbl(caption = "data base entries with eye-tracking") %>%
+  kable_paper("hover", full_width = T)
+
+#database entries that have ET data
+t(table(et_demogr$ID %in% demogr$id)) %>%
+  kbl(caption = "eye-tracking with data base entries") %>%
+  kable_paper("hover", full_width = T)
+
+##measurements per timepoint
+t(table(et_demogr$timepoint)) %>%
+  kbl(caption = "assessments per timepoint") %>%
+  kable_paper("hover", full_width = T)
+
+```
+
+## sample description
+
+sample description per group
+
+```{r sample by group}
+
+fun_return_descriptive<-function(variable,group){
+    mean_values<-by(variable,group,function(x){round(mean(x,na.rm=T),2)})
+    sd_values<-by(variable,group,function(x){round(sd(x,na.rm=T),2)})
+    paste0(mean_values,'/',sd_values)
+  }
+
+n_timepoint<-with(demogr,by(id,group,function(x){length(unique(x))}))
+gender<-with(demogr,by(Geschlecht_Index,group,function(x){paste0(table(x)[2],'/',table(x)[1])}))
+test_age<-with(demogr,fun_return_descriptive(variable=test_age,group=group))
+age<-with(demogr,fun_return_descriptive(variable=age_months,group=group))
+  
+descriptives_table<-rbind(n_timepoint,gender,age,test_age)
+
+row_names<-c('n','gender (F/M)','age (at T2; months)','test age (at T2; months)')
+
+descriptives_table<-cbind(row_names,descriptives_table)
+  
+table_sample<-descriptives_table %>%
+    kbl(caption = "Sample description per group",
+        col.names = c('','ASD','TD'),
+        row.names = F) %>%
+   kable_paper("hover", full_width = T)
+
+  table_sample
+
+```
+
+sample description per timepoint
+
+```{r sample by timepoints}
+
+fun_return_descriptive<-function(variable,group){
+    mean_values<-by(variable,group,function(x){round(mean(x,na.rm=T),2)})
+    sd_values<-by(variable,group,function(x){round(sd(x,na.rm=T),2)})
+    paste0(mean_values,'/',sd_values)
+  }
+
+#basic
+n_timepoint<-with(et_demogr,by(ID,timepoint,function(x){length(unique(x))}))
+gender<-with(et_demogr,by(Geschlecht_Index,timepoint,function(x){paste0(table(x)[2],'/',table(x)[1])}))
+test_age<-with(et_demogr,fun_return_descriptive(variable=test_age,group=timepoint))
+age<-with(et_demogr,fun_return_descriptive(variable=age_months,group=timepoint))
+
+#clinical (for those that are available in all)
+cbcl<-with(et_demogr,fun_return_descriptive(variable=CBCL_T_GES,group=timepoint))
+rbsr<-with(et_demogr,fun_return_descriptive(variable=RBSR_ges,group=timepoint))
+srs<-with(et_demogr,fun_return_descriptive(variable=srs_sum,group=timepoint))
+
+descriptives_table<-rbind(n_timepoint,gender,age,test_age,cbcl,rbsr,srs)
+
+row_names<-c('n','gender (F/M)','age (at T2; months)','test age (at T2; months)',
+             'CBCL (T, total)','RBS-R (total)','SRS (total)')
+
+descriptives_table<-cbind(row_names,descriptives_table)
+  
+table_sample<-descriptives_table %>%
+    kbl(caption = "Sample description per timepoint",
+        col.names = c('','ASD (T2)','ASD (T4)','ASD (T6)','ASD (FU2)','ASD (FU3)','NTC (T2)','NTC (FU2)'),
+        row.names = F) %>%
+   kable_paper("hover", full_width = T)
+
+  table_sample
+
+```
+
+
+## autism symptoms in sample
+
+```{r visualize symptom severity}
+
+#distribution ADOS
+g1<-ggplot(demogr, aes(x=Severity_Gesamt)) + 
+  geom_bar(color=1,fill=brewer.pal(3,'Dark2')[1]) + 
+  labs(x="ADOS CSS", y="occurances",title="ADOS-2") +
+  theme(plot.title = element_text(hjust = 0.5))
+#distribution BOSCC
+g2<-ggplot(demogr, aes(x=BOSCC_Average_Total)) + 
+  geom_histogram(bins=30,color=1,fill=brewer.pal(3,'Dark2')[1]) + 
+  labs(x="BOSCC Total (averaged)", y="occurances",title="BOSCC") +
+  theme(plot.title = element_text(hjust = 0.5))
+#distribution SRS
+custom_color<-c('ASD' = brewer.pal(3,'Dark2')[1], "TD" = brewer.pal(3,'Dark2')[2])
+g3<-ggplot(demogr, aes(x=group, y=srs.interp.rw, color=group)) + 
+  geom_violin() + geom_jitter()+ 
+  labs(x="group", y="SRS-16 raw score",title="SRS-16") +
+  scale_color_manual(values=custom_color)+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+grid.arrange(g1,g2,g3)
+
+```
+
+
+## Data Visualization
+
+### overview of assessment quality 
+
+```{r calibration_quality}
+
+t(table(calib_quality)) %>%
+  kbl(caption = "eye tracking data quality") %>%
+  kable_paper("hover", full_width = T)
+
+
+```
+
+### Overview of the assessments by asessment dates
+
+```{r assessment dates}
+ggplot(et_demogr,aes(x=ID,y=date,color=timepoint))+geom_point()+
+  theme(axis.text.x = element_blank())+
+  scale_color_manual(values = brewer.pal(7,'Dark2'), 
+                     labels=c("FU3" = "autistic (+48m)", 
+                              "FU2" = "autistic (+36m)", 
+                              "K" = "non-autistic (baseline)", 
+                              "K_FU" = "non-autistic (+36m)",
+                              "T2" = "autistic (baseline)",
+                              "T4" = 'autistic (+6m)',
+                              "T6" = "austistic (+12m)"))
+```
+
+### Distribution of test age (Bayley or WPPSI) compared to biological age
+
+```{r age data}
+
+g1<-ggplot(et_demogr,aes(x=test_age,fill=group))+geom_histogram(position='dodge')+xlab('test age (m)')
+g2<-ggplot(et_demogr,aes(x=age_months,fill=group))+geom_histogram(position='dodge')+xlab('biological age (m)')
+grid.arrange(g1,g2)
+
+```
+

@@ -3,7 +3,6 @@
 ## Script purpose: PREPROCESS JOINT ATTENTION DATA - BOSCA PROJECT
 ##
 ##
-##
 ## Author: Nico Bast
 ##
 ## Date Created: `r paste(Sys.Date())`
@@ -11,9 +10,15 @@
 ## Copyright (c) Nico Bast, `r paste(format(Sys.Date(), "%Y"))`
 ## Email: nico.bast@kgu.de
 ##
-##  INFO: extracted stimulus onset info from splitting videos intro frames with custom python script
-##  e.g.: CMD line = C:\Users\Nico\PowerFolders\project_video_salience\code\python_code_salience_extraction\split_video_to_images.py "neutral_rabbit_left" "C:\Users\Nico\PowerFolders\ETbat\Jointattention\stimuli\blockB"
-##  # tested with four videos: length ~ 550 frames = 11 s, face onset ~ 64-72 frames ~ 1.35 sec, cueing onset ~ 165-180 frames ~  3.46 sec, stimulus_shaking ~ 150 frames = 3 sec
+##  INFO:
+##
+##  - extracted stimulus onset info from splitting videos intro frames with custom python script
+##    e.g.: CMD line = C:\Users\Nico\PowerFolders\project_video_salience\code\python_code_salience_extraction\split_video_to_images.py "neutral_rabbit_left" "C:\Users\Nico\PowerFolders\ETbat\Jointattention\stimuli\blockB"
+##    --> tested with four videos: length ~ 550 frames = 11 s, face onset ~ 64-72 frames ~ 1.35 sec, cueing onset ~ 165-180 frames ~  3.46 sec, stimulus_shaking ~ 150 frames = 3 sec
+##
+##  - SYSTEM REQUIREMENTS: at least 64GB of RAM to read data of 314 sessions (13.03.2024)
+##  - Line 1-170: is independent of the task and describes general preprocessing of BOSCA data
+##  - Line 1100: demographic data is preprocessed by script sample_overview_Jan2024.Rmd - this data is used here
 
 # SETUP ####
 
@@ -84,7 +89,7 @@ id_names_files[!(id_names_files %in% id_names_time)]
 id_names_events[!(id_names_events %in% id_names_time)]
 ##--> empty
 
-# data.files<-data.files[data.files!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_gazedata.csv"]
+data.files<-data.files[data.files!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_gazedata.csv"]
 # data.events<-data.events[data.events!="C:/Users/Nico/PowerFolders/data_AFFIP/data/066_fu2_event.csv"]
 
 #sorting - that files names match (k_fu introduced different sorting in data.files versus data.events)
@@ -97,6 +102,9 @@ data.files<-data.files[order_data]
 data.events<-data.events[order_events]
 data.time<-data.time[order_time]
 
+#do files match? --> visual inspection
+cbind(substr(data.files,44,57),substr(data.events,44,54),substr(data.time,44,54))
+
 #READ
 #read csv is very slow
 df.list.data<-list(0)
@@ -105,7 +113,7 @@ for(i in 1:length(data.files)){
   print(paste0('read: ',i))
 }
 ###16 gb fails after 118 entries --> requires at least 32GB (June 2022)
-###--> fine for 64gb of memory (March 2023)
+###--> fine for 64gb of memory (March 2024 --> 314 data entries)
 ### for loop is slower, but does not kill memory
 
 #df.list.data<-lapply(data.files,read.csv)
@@ -160,9 +168,11 @@ rm(df.list.data, df.list.events, df.list.time)
 
 #save(df,file="F:/temp_data_AFFIP/all_data_merged_040722.Rdata")
 #save(df,file="C:/Users/nico/Desktop/BOSCA_joint_attention_all_data_merged_060323.Rdata")
-save(df,file="C:/Users/nico/Desktop/BOSCA_joint_attention_all_data_merged_170423.Rdata")
+#save(df,file="C:/Users/nico/Desktop/BOSCA_joint_attention_all_data_merged_170423.Rdata")
+save(df,file="C:/Users/nico/Desktop/BOSCA_all_data_merged_130324.Rdata")
+###-->save takes very long
 
-#now found on NAS
+#--> now found on NAS
 
 end_time <- Sys.time()
 end_time - start_time
@@ -231,7 +241,7 @@ list_jointatt<-fun_define_trials(list_jointatt)
 list_jointatt<-pblapply(list_jointatt,function(x){x[x$index_trial<=16,]})
 
 #---------------------------------------------------------------------------------------------------#
-# DATA PREPROCESSING ####
+# EYE TRACKING DATA PREPROCESSING ####
 
 rm(ts)
 
@@ -809,7 +819,7 @@ func_pd_preprocess<-function(x){
 }
 
 # pd.list<-lapply(df, func_pd_preprocess)
-list_jointatt<-lapply(list_jointatt, func_pd_preprocess)
+list_jointatt<-pblapply(list_jointatt, func_pd_preprocess)
 
 ### - select relevant data ####
 
@@ -821,7 +831,7 @@ fun_select_data<-function(x){
   return(x)
 }
 
-list_jointatt<-lapply(list_jointatt,fun_select_data)
+list_jointatt<-pblapply(list_jointatt,fun_select_data)
 
 ### - create ID variable - required before concatenating blocks ####
 fun_retrieve_id<-function(x,id){
@@ -848,19 +858,17 @@ fun_baseline<-function(x){
 
 }
 
-list_jointatt<-lapply(list_jointatt,fun_baseline)
+list_jointatt<-pblapply(list_jointatt,fun_baseline)
 
 ###------ save preprocessed data (single sample level) #####
 df_jointatt<-dplyr::bind_rows(list_jointatt)
 
-#save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060922.Rdata"))
-save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_070323.Rdata"))
+save(df_jointatt,file=paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_130324.Rdata"))
 
 #### limit data to first 11 seconds ####
 
 #load(paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_060922.Rdata"))
 #load(paste0(home_path,project_path,"/data/all_data_preprocessed_jointatt_150922.Rdata"))
-
 
 hist(df_jointatt$ts_event,40)
 df_jointatt<-df_jointatt[df_jointatt$ts_event<=3300,]
@@ -1065,13 +1073,11 @@ fun_find_rja<-function(x,samples_of_500ms=150,rja_start=900){
 }
 
 
-df_jointatt$rja<-unsplit(sapply(split_by_trial,fun_find_rja),f=interaction(df_jointatt$id,df_jointatt$index_trial))
-#df_jointatt$rja<-unlist(sapply(split_by_trial,fun_find_rja))
+df_jointatt$rja<-unsplit(pbsapply(split_by_trial,fun_find_rja),
+                         f=interaction(df_jointatt$id,df_jointatt$index_trial))
 
 #additional variables
 df_jointatt$rja_when<-ifelse(df_jointatt$rja,df_jointatt$ts_event,NA)
-#df_jointatt$rja_early<-ifelse(df_jointatt$rja_when<1300,T,F)
-#df_jointatt$rja_late<-ifelse(df_jointatt$rja_when>1300,T,F)
 df_jointatt$rja_early<-ifelse(df_jointatt$rja_when<1200,T,F)
 df_jointatt$rja_late<-ifelse(df_jointatt$rja_when>1200 & df_jointatt$rja_when<2100,T,F)
 
@@ -1101,26 +1107,27 @@ df_jointatt$rja_late<-ifelse(df_jointatt$rja_when>1200 & df_jointatt$rja_when<21
 
 #- DEMOGRAPHIC DATA #####
 
-#demogr
-#load("C:/Users/Nico/PowerFolders/project_visualsearch/data/demogr_data_270722")
+#demographic data is created with sample_overview_Jan2024.Rmd
+#TODO: need new data export
 load(paste0(home_path,project_path,"/data/demogr_data_270722"))
-# #d
-# load(paste0(home_path,project_path,"/data/demogr_data_Dec2022_onlyAgeIqSex"))
-# with(d,by(test_age,Testzeitpunkt,mean))
-# with(d,table(Testzeitpunkt))
-
+load(paste0(home_path,"/PowerFolders/data_AFFIP/demogr_total_baseline_0623.Rdata"))
 
     unique(df_jointatt$pic)
     demogr$id
     ###->
     unique(df_jointatt$pic)[!(unique(df_jointatt$pic) %in% substr(demogr$id,1,3))]
-    ### two have ET data but no demographics
-    table(df_jointatt$id)
+    ### one has ET data but no demographics (14.03.2024)
+    hist(table(df_jointatt$id))
 
 unique(demogr$id)
 demogr$id<-substr(demogr$id,1,3)
 
 demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
+
+    ##-->currently FU is missing
+    table(demogr$group,demogr$t_IQ)
+    table(demogr$group,demogr$t)
+
 
     ## - exclude IDs  with assessments problems (n=4)####
 
@@ -1182,22 +1189,25 @@ demogr$group<-ifelse(substr(demogr$id,1,1)=='9','TD','ASD')
 
 #--> DATA PLAUSIBILITY AFTER MATCHING ####
 
-### - check data distribution --> trimming of implausible data ####
+### - check data distribution  ####
 
 
 #trial time
 hist(df_jointatt$ts_event)
 
-#initial data plausibility
+#initial data plausibility --> similar data scross trials
 table(df_jointatt$index_trial)
 
 #individual data sets
-length(unique(df_jointatt$id)) #data of 171 measurement timepoints after matching
-length(unique(df_jointatt$pic)) #data of 101 participants after matching)
+  #length(unique(df_jointatt$id)) #data of 171 measurement timepoints after matching
+  #length(unique(df_jointatt$pic)) #data of 101 participants after matching)
+
+length(unique(df_jointatt$id)) #data of 300 measurement timepoints before matching (march 2024)
+length(unique(df_jointatt$pic)) #data of 143 participants before matching (march 2024)
 by(df_jointatt$id,df_jointatt$timepoint,function(x){length(unique(x))})
 ##--> after matching (September 2022): K = 44, T2 = 51, T4 = 44, T6 = 32
 ##--> without matching (March 2023): K = 65, T2 = 62, T4 = 53, T6 = 47, K_FU = 20, FU2 = 15, FU3 = 2
-
+##--> without matching (March 2024): K = 75, T2 = 62, T4 = 53, T6 = 47, K_FU = 26, FU2 = 25, FU3 = 12
 
 #missing data
 table(is.na(df_jointatt$rpd))[2]/sum(table(is.na(df_jointatt$rpd))) #--> 43.2 missing data in pupil data
@@ -1222,7 +1232,7 @@ par(mfrow = c(1, 1))
 hist(as.numeric(with(df_jointatt[df_jointatt$fixation,],
                      by(index_trial,id,function(x){length(unique(x))}))),xlab='trials',main='trials with fixation data by participant')
 
-### --> visualize gaze behavior (for INSAR abstract) ####
+### --> visualize gaze behavior (for INSAR 2023 abstract) ####
 
 #gaze behavior
 require(ggplot2)
@@ -1334,8 +1344,6 @@ ggplot(df_jointatt[df_jointatt$ts_event>1000 & df_jointatt$ts_event<1100,],aes(x
 
 ### --> visualize RJA ####
 
-
-
 ##RJA
 ggplot(df_jointatt,aes(x=rja_when/300))+
   geom_density(fill='orange')+
@@ -1344,7 +1352,6 @@ ggplot(df_jointatt,aes(x=rja_when/300))+
   xlim(c(0,12))+
   geom_vline(xintercept=1)+geom_vline(xintercept=3.5,linetype='dashed')+geom_vline(xintercept=9.5,linetype='dashed')+
   theme_bw()
-
 
 #change facotr ordering
 #df_jointatt$timepoint <- factor(df_jointatt$timepoint, levels = c("T2", "T4", "T6", "FU2", "FU3","K","K_FU"))
@@ -1393,7 +1400,7 @@ ggplot(df_jointatt[df_jointatt$fixation & !is.na(df_jointatt$gaze_target),],aes(
   facet_grid(vars(condition),vars(position))+
   theme_bw()
 
-### --> visualize pupillary response progression (for INSAR abstract) ####
+### --> visualize pupillary response progression (for INSAR 2023 abstract) ####
 #pupil size progression - between conditions
 
 #--> overall pupillary response
@@ -1431,7 +1438,7 @@ split_by_trial<-split(df_jointatt,interaction(df_jointatt$id,df_jointatt$index_t
 
 cueing_onset<-1050
 #time to target
-time_to_target<-sapply(split_by_trial,function(x,stimulus_onset=cueing_onset,frequency=300){
+time_to_target<-pbsapply(split_by_trial,function(x,stimulus_onset=cueing_onset,frequency=300){
 
   relevant_data<-x$ts_event[x$fixation & x$gaze_target & x$ts_event>stimulus_onset]
 
@@ -1442,7 +1449,7 @@ time_to_target<-sapply(split_by_trial,function(x,stimulus_onset=cueing_onset,fre
 })
 
 #time to distractor
-time_to_distractor<-sapply(split_by_trial,function(x,stimulus_onset=cueing_onset,frequency=300){
+time_to_distractor<-pbsapply(split_by_trial,function(x,stimulus_onset=cueing_onset,frequency=300){
 
   relevant_data<-x$ts_event[x$fixation & x$gaze_distractor & x$ts_event>stimulus_onset]
 
@@ -1464,17 +1471,17 @@ time_to_distractor<-sapply(split_by_trial,function(x,stimulus_onset=cueing_onset
 
 #pupillary response - rpd is already corrected for baseline
 ## --> cutoff defined by pupillary respons progression
-rpd_early<-sapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>300 & x$ts_event<600],na.rm=T)})
-rpd_middle<-sapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>1350 & x$ts_event<1650],na.rm=T)})
-rpd_late<-sapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>3000 & x$ts_event<3300],na.rm=T)})
+rpd_early<-pbsapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>300 & x$ts_event<600],na.rm=T)})
+rpd_middle<-pbsapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>1350 & x$ts_event<1650],na.rm=T)})
+rpd_late<-pbsapply(split_by_trial,function(x){mean(x$rpd[x$ts_event>3000 & x$ts_event<3300],na.rm=T)})
 
 #gaze durations - based on fixations
 frequency<-300
 time_per_sample<-1/frequency
-gazeduration_fixcross<-sapply(split_by_trial,function(x){table(x$gaze_fixcross[x$fixation])[2]*time_per_sample})
-gazeduration_head<-sapply(split_by_trial,function(x){table(x$gaze_head[x$fixation])[2]*time_per_sample})
-gazeduration_headbefore<-sapply(split_by_trial,function(x){table(x$gaze_head_before[x$fixation])[2]*time_per_sample})
-gazeduration_headafter<-sapply(split_by_trial,function(x){table(x$gaze_head_after[x$fixation])[2]*time_per_sample})
+gazeduration_fixcross<-pbsapply(split_by_trial,function(x){table(x$gaze_fixcross[x$fixation])[2]*time_per_sample})
+gazeduration_head<-pbsapply(split_by_trial,function(x){table(x$gaze_head[x$fixation])[2]*time_per_sample})
+gazeduration_headbefore<-pbsapply(split_by_trial,function(x){table(x$gaze_head_before[x$fixation])[2]*time_per_sample})
+gazeduration_headafter<-pbsapply(split_by_trial,function(x){table(x$gaze_head_after[x$fixation])[2]*time_per_sample})
 gazeduration_stimulusleft<-sapply(split_by_trial,function(x){table(x$gaze_stimulus_left[x$fixation])[2]*time_per_sample})
 gazeduration_stimulusright<-sapply(split_by_trial,function(x){table(x$gaze_stimulus_right[x$fixation])[2]*time_per_sample})
 gazeduration_stimulus<-ifelse(is.na(gazeduration_stimulusleft),gazeduration_stimulusright,gazeduration_stimulusleft)
@@ -1539,13 +1546,13 @@ warning('did you match data, then look here + latest dmeographic file required')
 # df_trial<-merge(df_trial,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id',all.x=T)
 # df_jointatt<-merge(df_jointatt,all.match[,!(names(all.match)=='group')],by.x='pic',by.y='id')
 
-#for unmatched --> latest demographic file required
+#for unmatched --> latest demographic file required (CURRENTLY NOT AVAILABLE)
 df_trial<-merge(df_trial,demogr,by.x='pic',by.y='id',all.x=T)
 df_jointatt<-merge(df_jointatt,demogr,by.x='pic',by.y='id',all.x = T)
 
 ###--> save final data frame ####
 
-save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_070323.Rdata"))
+save(df_jointatt, df_trial, demogr, file=paste0(home_path,project_path,"/data/all_data_preprocessed_FINAL_jointatt_140324.Rdata"))
 
   ### --------------- ####
 
