@@ -4,6 +4,8 @@ output:
   html_document: default
   pdf_document: default
 date: "2023-06-05"
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -242,7 +244,7 @@ define group and save to file
 demogr$group <- "ASD"
 demogr$group[grep("_K",demogr$id)]<-"TD"
 
-save(demogr, file=paste0(savepath,'demogr_total_baseline_0623.Rdata'))
+#save(demogr, file=paste0(savepath,'demogr_total_baseline_0623.Rdata'))
 
 #check if there are duplicates in participants
 # ADOS$ID_Bado[duplicated(ADOS$ID_Bado)==T]

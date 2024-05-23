@@ -1,0 +1,579 @@
+---
+title: "demographic data preprocessing in A-FFIP (BOSCA battery)"
+author: "Nico Bast"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cerulean
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+- purpose: create one dataframe "demogr" that contains one measurement timepoint per row
+- info: combines data of two databases (RCT = ASD, nonASD, nonASD follow-up; FU = ASD follow-up)
+- info: timepoint FU4 is not considered now as too few cases
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+
+#required packages
+require(dplyr)
+require(RColorBrewer)
+require(ggplot2)
+require(kableExtra)
+require(gridExtra)
+require(readxl)
+
+#set theme
+theme_set(theme_bw())
+
+#data_path
+datapath<-'C:/Users/nico/PowerFolders/data_AFFIP/database_exports/2024_03/' 
+
+savepath<-'C:/Users/nico/PowerFolders/data_AFFIP/'
+eyetracking_dataquality_file<-"C:/Users/nico/PowerFolders/data_AFFIP/data/Quality sheet/AFFIPeyetracking_quality.xlsx"
+
+rctstatus_path<-"C:/Users/nico/PowerFolders/data_AFFIP/rct_data/export_random_20230728.csv"
+
+```
+
+# load RCT data (clincial trial group)
+
+- received therapy as defined in the A-FFIP RCT trial
+
+```{r}
+
+rct_status<-read.csv(rctstatus_path)
+rct_status<-rct_status[rct_status$centno==1,names(rct_status) %in% c('scrnno','rndm')]
+
+rct_status$rndm<-as.factor(rct_status$rndm)
+levels(rct_status$rndm)<-c('A-FFIP','EIAU')
+
+rct_status$scrnno<-as.character(rct_status$scrnno)
+rct_status$scrnno<-ifelse(nchar(rct_status$scrnno)==2,paste0('0',rct_status$scrnno),rct_status$scrnno)
+rct_status$scrnno<-ifelse(nchar(rct_status$scrnno)==1,paste0('00',rct_status$scrnno),rct_status$scrnno)
+
+```
+
+
+# load checklist 
+
+- as master merge file (March 2024 - all included)
+
+```{r prepare database output}
+
+list.files(datapath)
+
+##LOAD checklist####
+checklist_rct<-read_xlsx(paste0(datapath,'RCT/Checkliste.xlsx'))
+checklist_fu<-read_xlsx(paste0(datapath,'FU/Checkliste.xlsx'))
+
+#correct wrong entry of ID_Bado in FU database
+wrong_entry<-checklist_fu$ID_Bado[!checklist_fu$ID_Bado %in% checklist_rct$ID_Bado]
+checklist_fu$ID_Bado[checklist_fu$ID_Bado==wrong_entry]<-"14854-2018"
+
+checklist_rct <- select(checklist_rct, ID_Bado, ID_Studie, Geschlecht_Index, Geburt_Index, Gruppe)
+checklist_fu <- select(checklist_fu, ID_Bado, ID_Studie, Geschlecht_Index, Geburt_Index, Gruppe)
+
+print('demographic data is available for:')
+checklist_rct$ID_Studie
+
+```
+
+# IQ data
+
+- calculate based on WPPSI or Bayley measures
+- IQ is either value measure by Bayley, WPPSI (3rd or 4th edition), and WISC (specific to follow-up)
+
+```{r derive IQ}
+
+##LOAD Bayley/WPPSI####
+#WPPSI:
+wppsi3 <- read_xlsx(paste0(datapath,'RCT/WPPSI_3_0_3_11.xlsx'))
+wppsi3 <- select(wppsi3, ID_Bado, Datum, Messzeitpunkt, Verbalteil_IQ, Handlungsteil_IQ)
+wppsi3$test <- "wppsi3"
+names(wppsi3)<-c('ID_Bado','date_iq','t','verbal_iq','nonverbal_iq','iq_test')
+
+
+wppsi4_rct <- read_xlsx(paste0(datapath,'RCT/WPPSI_4_0_7_2.xlsx'))
+wppsi4_fu <- read_xlsx(paste0(datapath,'FU/WPPSI_4_0_7_2.xlsx'))
+wppsi4_rct <- select(wppsi4_rct, ID_Bado, Datum, Messzeitpunkt, Verbalteil_IQ, Handlungsteil_IQ)
+wppsi4_fu <- select(wppsi4_rct, ID_Bado, Datum, Messzeitpunkt, Verbalteil_IQ, Handlungsteil_IQ)
+wppsi4<-rbind(wppsi4_rct,wppsi4_fu)
+wppsi4$test <- "wppsi4"
+names(wppsi4)<-c('ID_Bado','date_iq','t','verbal_iq','nonverbal_iq','iq_test')
+
+wisc4_RCT <- read_xlsx(paste0(datapath,'RCT/HAWIK-IV.xlsx'))
+wisc4_FU <- read_xlsx(paste0(datapath,'FU/WISC_IV.xlsx'))
+wisc4_RCT <- select(wisc4_RCT, ID_Bado, DatumHawikIV, Meßzeit_HawikIV, Hawik_IV_SV, Hawik_IV_WLD )
+wisc4_FU <- select(wisc4_FU, ID_Bado, DatumWISC, Meßzeit_WISC, WISC_WLD_IQ_tab)
+names(wisc4_RCT)<-c('ID_Bado','date_iq','t','nonverbal_iq','verbal_iq','nonverbal_iq')
+names(wisc4_FU)<-c('ID_Bado','date_iq','t','nonverbal_iq','nonverbal_iq')
+wisc4_FU$verbal_iq<-NA
+wisc4_FU$iq_test<-"wisc4"
+wisc4_RCT$iq_test<-"wisc4"
+wisc4<-rbind(wisc4_RCT,wisc4_FU)
+
+wppsi <- rbind(wppsi3, wppsi4, wisc4)
+
+
+#BAYLEY:
+bayley_rct <- read_xlsx(paste0(datapath,'RCT/Bayley III.xlsx'))
+bayley_fu <- read_xlsx(paste0(datapath,'FU/Bayley III.xlsx'))
+
+bayley_rct <- select(bayley_rct, ID_Bado, Datum_BayleyIII, Meßzeit_BayleyIII, SprR_EQ, Kog_EQ)
+bayley_fu <- select(bayley_fu, ID_Bado, Datum_BayleyIII, Meßzeit_BayleyIII, SprR_EQ, Kog_EQ)
+
+bayley<-rbind(bayley_rct,bayley_fu)
+
+names(bayley) <- c("ID_Bado",'date_iq',"t","verbal_iq", "nonverbal_iq")
+bayley$iq_test<-'bayley3'
+
+#get one data frame for cognitive ability
+cog_abil <- rbind(bayley, wppsi)
+
+#number of unique iq estimates
+length(unique(interaction(cog_abil$ID_Bado,cog_abil$t)))
+
+```
+
+- remove duplicates and recover incomplete entries in IQ data
+
+```{r}
+# #check if there are duplicates (probably wppsi cognitive and bayley sprache eingegeben)
+duplicates<-interaction(cog_abil$ID_Bado,cog_abil$t)[duplicated(interaction(cog_abil$ID_Bado,cog_abil$t))] 
+cog_abil_no_duplicates<-cog_abil[!(interaction(cog_abil$ID_Bado,cog_abil$t) %in% duplicates),]
+
+#remove double entries:
+cog_abil_duplicates<-cog_abil[interaction(cog_abil$ID_Bado,cog_abil$t) %in% duplicates,]
+cog_abil_duplicates<-unique(cog_abil_duplicates) 
+
+#differentiate to  complete and incomplete duplicates:
+cog_abil_complete_duplicates<-cog_abil_duplicates[!is.na(cog_abil_duplicates$verbal_iq) &
+                                                    !is.na(cog_abil_duplicates$nonverbal_iq),]
+cog_abil_incomplete_duplicates<-cog_abil_duplicates[is.na(cog_abil_duplicates$verbal_iq) |
+                                                    is.na(cog_abil_duplicates$nonverbal_iq),]
+
+#select incomplete duplicates that can be recovered as they have two entries:
+duplicates_incomplete<-interaction(cog_abil_incomplete_duplicates$ID_Bado,
+                            cog_abil_incomplete_duplicates$t)[
+                            duplicated(interaction(cog_abil_incomplete_duplicates$ID_Bado,
+                                                   cog_abil_incomplete_duplicates$t))] 
+
+cog_abil_incomplete_duplicates_nonrecover<-cog_abil_incomplete_duplicates[
+  !(interaction(cog_abil_incomplete_duplicates$ID_Bado,cog_abil_incomplete_duplicates$t) %in% duplicates_incomplete),]
+
+cog_abil_incomplete_duplicates_recover<-cog_abil_incomplete_duplicates[
+  (interaction(cog_abil_incomplete_duplicates$ID_Bado,cog_abil_incomplete_duplicates$t) %in% duplicates_incomplete),]
+
+#recoverable incomplete duplicates: order by id and timepoint
+cog_abil_incomplete_duplicates_recover<-cog_abil_incomplete_duplicates_recover[
+  order(cog_abil_incomplete_duplicates_recover$ID_Bado,cog_abil_incomplete_duplicates_recover$t),]
+
+#recoverable incomplete duplicates: to odd and even set that can be merged 
+cog_abil_incomplete_duplicates_recover_odd<-cog_abil_incomplete_duplicates_recover[seq(1,46,2),]
+cog_abil_incomplete_duplicates_recover_even<-cog_abil_incomplete_duplicates_recover[seq(2,46,2),]
+cog_abil_incomplete_duplicates_recover_even<-select(cog_abil_incomplete_duplicates_recover_even,
+                                                    ID_Bado,t,verbal_iq,nonverbal_iq)
+cog_abil_incomplete_duplicates_recover<-merge(cog_abil_incomplete_duplicates_recover_odd,
+                                              cog_abil_incomplete_duplicates_recover_even,
+                                              by=c('ID_Bado','t'))
+
+#recoverable incomplete duplicates: recover process
+cog_abil_incomplete_duplicates_recover$verbal_iq.x<-
+     with(cog_abil_incomplete_duplicates_recover,ifelse(is.na(verbal_iq.x),verbal_iq.y,verbal_iq.x))
+
+cog_abil_incomplete_duplicates_recover$nonverbal_iq.x<-
+     with(cog_abil_incomplete_duplicates_recover,ifelse(is.na(nonverbal_iq.x),nonverbal_iq.y,nonverbal_iq.x))
+
+cog_abil_incomplete_duplicates_recover<-select(cog_abil_incomplete_duplicates_recover,
+                                               ID_Bado,t,date_iq,verbal_iq.x,nonverbal_iq.x,iq_test)
+
+names(cog_abil_incomplete_duplicates_recover)<-c('ID_Bado','t','date_iq','verbal_iq','nonverbal_iq','iq_test')
+
+
+#bind all together: no duplicate , complete duplicates, nonrecover duplicates, recovered duplicates (recover)
+cog_abil<-rbind(
+  cog_abil_no_duplicates,
+  cog_abil_complete_duplicates,
+  cog_abil_incomplete_duplicates_nonrecover,
+  cog_abil_incomplete_duplicates_recover
+)
+
+##avaialable data
+
+with(cog_abil,table(t,!is.na(nonverbal_iq)))
+with(cog_abil,table(iq_test))
+
+#number of unique iq estimates
+length(unique(interaction(cog_abil$ID_Bado,cog_abil$t)))
+
+```
+
+# load ADI
+
+```{r load measures}
+
+##LOAD ADI####
+ADI <- read_xlsx(paste0(datapath,'RCT/ADI-R.xlsx'))
+ADI$adi.sum.algo <- ADI$ADI_alg_SOZ_INT+ADI$ADI_alg_KOM+ADI$ADI_alg_RITUALE
+ADI$adi.sum.toddler <- ADI$ADI_Toddler_ges
+ADI$adi.sum.algo[ADI$adi.sum.toddler>1]<-NA
+ADI <- select(ADI, ID_Bado, DatumADI, adi.sum.algo, adi.sum.toddler)
+names(ADI)[names(ADI)=='DatumADI']<-'date_adi'
+
+##remove duplicated value (ADI difference by one point)
+ADI$ID_Bado[duplicated(ADI$ID_Bado)]
+ADI<-ADI[!duplicated(ADI$ID_Bado),]
+
+hist(ADI$adi.sum.algo)
+hist(ADI$adi.sum.toddler)
+
+```
+
+
+# load ADOS data 
+
+- combine data of different modules
+- ADOS is only available in RCT data, not for FU
+
+```{r ados}
+
+##LOAD ADOS####
+ADOS_M1 <- read_xlsx(paste0(datapath,'RCT/ADOS_2_M1_G_WPS.xlsx'))
+ADOS_M1 <- ADOS_M1[!ADOS_M1$rating!=1,] #exclude video coding - removes duplicates
+ADOS_M1 <- select(ADOS_M1, ID_Bado, DatumADOS_2_M1_G_WPS,Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M1)[names(ADOS_M1)=="DatumADOS_2_M1_G_WPS"]<-'date_ados'
+ADOS_M1$module <- "1"
+
+ADOS_M2 <- read_xlsx(paste0(datapath,'RCT/ADOS_2_M2_WPS.xlsx'))
+ADOS_M2 <- ADOS_M2[!ADOS_M2$rating!=1,] #exclude video coding
+ADOS_M2 <- select(ADOS_M2, ID_Bado, DatumADOS_2_M2,Severity_SA, Severity_RRB, Severity_Gesamt)
+names(ADOS_M2)[names(ADOS_M2)=="DatumADOS_2_M2"]<-'date_ados'
+ADOS_M2$module <- "2"
+ADOS <- rbind(ADOS_M1, ADOS_M2)
+
+hist(ADOS$Severity_Gesamt)
+
+```
+
+# load BOSCC
+
+```{r BOSCC}
+
+####LOAD BOSCC###
+BOSCC <- read_xlsx(paste0(datapath,'RCT/BOSCC.xlsx')) # only available for RCT
+BOSCC <- select(BOSCC, ID_Bado, Meßzeit_BOSCC, Datum_BOSCC,BOSCC_Average_Total, BOSCC_SA, BOSCC_RRB)
+names(BOSCC)<-c('ID_Bado','t','date_boscc','BOSCC_Average_Total','BOSCC_SA','BOSCC_RRB')
+
+hist(BOSCC$BOSCC_Average_Total)
+with(BOSCC,table(t,!is.na(BOSCC_Average_Total)))
+
+```
+
+# load ESCS
+
+```{r ESCS}
+
+ESCS <- read_xlsx(paste0(datapath,'RCT/ESCS.xlsx'))
+ESCS <- select(ESCS,ID_Bado,Meßzeit_ESCS,Datum_ESCS,Total_RJA,Total_IJA,Total_IBR,Total_ISI,Total_RSI)
+names(ESCS)[2]<-'t'
+names(ESCS)[3]<-'date_escs'
+
+##--> ESCS not available at T6?
+with(ESCS,table(is.na(Total_RJA),t))
+
+```
+
+# load CBCL data
+
+```{r CBCL}
+
+####LOAD CBCL###
+cbcl_preschool_RCT <- read_xlsx(paste0(datapath,'RCT/CBCL1_5_5.xlsx'))
+cbcl_school_RCT <- read_xlsx(paste0(datapath,'RCT/CBCL_4_18.xlsx'))
+cbcl_preschool_FU <- read_xlsx(paste0(datapath,'FU/CBCL1_5_5.xlsx'))
+cbcl_school_FU <- read_xlsx(paste0(datapath,'FU/CBCL_4_18.xlsx'))
+
+cbcl_preschool_RCT<-select(cbcl_preschool_RCT,ID_Bado, Meßzeit_CBCLV, Datum_CBCLV,
+                           CBCLalter, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+cbcl_school_RCT<-select(cbcl_school_RCT,ID_Bado, Meßzeit_CBCL, Datum_CBCL, 
+                        CBCLalter, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+cbcl_preschool_FU<-select(cbcl_preschool_FU,ID_Bado, Meßzeit_CBCLV, Datum_CBCLV, 
+                          CBCLalter, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+cbcl_school_FU<-select(cbcl_school_FU,ID_Bado, Meßzeit_CBCL, Datum_CBCL,
+                       CBCLalter, CBCL_T_INT, CBCL_T_EXT, CBCL_T_GES)
+
+cbcl_preschool_RCT$CBCL_type<-'CBCL1_5'
+cbcl_preschool_FU$CBCL_type<-'CBCL1_5'
+cbcl_school_RCT$CBCL_type<-'CBCL4_18'
+cbcl_school_FU$CBCL_type<-'CBCL4_18'
+
+names(cbcl_preschool_RCT)<-c('ID_Bado','t','date_cbcl','CBCL_age','CBCL_T_INT','CBCL_T_EXT','CBCL_T_GES','CBCL_type')
+names(cbcl_preschool_FU)<-c('ID_Bado','t','date_cbcl','CBCL_age','CBCL_T_INT','CBCL_T_EXT','CBCL_T_GES','CBCL_type')
+names(cbcl_school_RCT)<-c('ID_Bado','t','date_cbcl','CBCL_age','CBCL_T_INT','CBCL_T_EXT','CBCL_T_GES','CBCL_type')
+names(cbcl_school_FU)<-c('ID_Bado','t','date_cbcl','CBCL_age','CBCL_T_INT','CBCL_T_EXT','CBCL_T_GES','CBCL_type')
+
+cbcl<-rbind(
+  cbcl_preschool_RCT,
+  cbcl_school_RCT,
+  cbcl_preschool_FU,
+  cbcl_school_FU
+)
+
+cbcl<-cbcl[!is.na(cbcl$t),]
+
+hist(cbcl$CBCL_T_GES)
+with(cbcl,table(t,!is.na(CBCL_T_GES)))
+
+```
+
+# load SRS
+
+```{r SRS}
+
+####LOAD SRS####
+srs_RCT <- read_xlsx(paste0(datapath,'RCT/SRS.xlsx'))
+srs_FU <- read_xlsx(paste0(datapath,'FU/SRS.xlsx'))
+srs_RCT <- srs_RCT[!srs_RCT$Beurteiler=="Erzieher/innen",]
+srs_FU <- srs_FU[!srs_FU$Beurteiler=="Erzieher/innen",]
+srs_RCT <- select(srs_RCT, ID_Bado, Meßzeit_SRS, Datum_SRS, Gesamtwert_N_k_RW)
+srs_FU <- select(srs_FU, ID_Bado, Meßzeit_SRS, Datum_SRS, Gesamtwert_N_k_RW)
+srs<-rbind(srs_RCT,srs_FU)
+names(srs)<-c("ID_Bado",'t','date_srs',"srs16_sum")
+
+hist(srs$srs16_sum)
+with(srs,table(t,!is.na(srs16_sum)))
+
+```
+
+# load RBS-R
+
+```{r rbsr}
+
+####LOAD RBS-R####
+rbs_rct <- read_xlsx(paste0(datapath,'RCT/RBS.xlsx'))
+rbs_fu <- read_xlsx(paste0(datapath,'FU/RBS.xlsx'))
+rbs_rct <- rbs_rct[!rbs_rct$Beurteiler=="Erzieher/innen",]
+rbs_fu <- rbs_fu[!rbs_fu$Beurteiler=="Erzieher/innen",]
+
+rbs_rct <- select(rbs_rct, ID_Bado, Meßzeit_RBS, Datum_RBS, RBSR_ges)
+rbs_fu <- select(rbs_fu, ID_Bado, Meßzeit_RBS,  Datum_RBS, RBSR_ges)
+
+rbs<-rbind(rbs_rct,rbs_fu)
+names(rbs)[2]<-'t'
+names(rbs)[3]<-'date_rbsr'
+
+hist(rbs$RBSR_ges)
+with(rbs,table(t,!is.na(RBSR_ges)))
+
+```
+
+# load socioeconomic status 
+
+```{r SES}
+
+SES<-read_xlsx(paste0(datapath,'RCT/SES.xlsx'))
+SES <- select(SES,ID_Bado,SES_Schule_Mutter,SES_Beruf_Mutter,SES_Schule_Vater,SES_Beruf_Vater)
+
+```
+
+# remove duplicates
+
+```{r}
+
+ADI<-ADI[!duplicated(ADI$ID_Bado),]
+ADOS<-ADOS[!duplicated(ADOS$ID_Bado),]
+BOSCC<-BOSCC[!duplicated(interaction(BOSCC$ID_Bado,BOSCC$t)),]
+ESCS<-ESCS[!duplicated(interaction(ESCS$ID_Bado,ESCS$t)),]
+cbcl<-cbcl[!duplicated(interaction(cbcl$ID_Bado,cbcl$t)),]
+srs<-srs[!duplicated(interaction(srs$ID_Bado,srs$t)),]
+rbs<-rbs[!duplicated(interaction(rbs$ID_Bado,rbs$t)),] 
+SES<-SES[!duplicated(SES$ID_Bado,ESCS$t),]
+
+```
+
+# merge data
+
+- consider that measures are assessed at different timepoints
+- however we want a dataframe with one row per timepoint and participant
+- this is solved by creating a shadow data frame with all possible timepoints
+- controls (K) get no timepoint assigned ---> corrected here
+
+```{r  merge}
+
+#repeat checklist per possible timepoints
+checklist_rct$ID_Bado #only use RCT data as all FU are also in RCT
+possible_timepoints<-c('T1','T2','T3','T4','T5','T6','FU','FU2','FU3')
+ID_Bado<-rep(checklist_rct$ID_Bado,each=length(possible_timepoints))
+t<-rep(possible_timepoints,times=nrow(checklist_rct))
+shadow_df<-data.frame(ID_Bado,t)
+
+#merge with checklist
+demogr<-merge(shadow_df,checklist_rct,by='ID_Bado')
+
+#randomization / group data
+demogr<-merge(demogr,rct_status,by.x='ID_Studie',by.y = 'scrnno',all.x=T)
+
+#merge ADOS & ADI & SES - independent of timepoint
+demogr<-merge(demogr,ADOS,by='ID_Bado',all.x=T)
+demogr <- merge(demogr, ADI, by="ID_Bado", all.x=T)
+demogr <- merge(demogr, SES, by="ID_Bado", all.x=T)
+
+#merge BOSCC (t2,t4,t6)
+demogr <- merge(demogr, BOSCC, by=c("ID_Bado",'t'), all.x=T)
+
+#merge ESCS (t2,t3,t4,t5)
+demogr <- merge(demogr, ESCS, by=c("ID_Bado",'t'), all.x=T)
+
+demogr <- merge(demogr, cbcl, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, srs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, rbs, by=c("ID_Bado","t"), all.x=T)
+demogr <- merge(demogr, cog_abil,by=c("ID_Bado","t"),all.x=T)
+
+```
+
+# eye-tracking data quality
+
+load eye tracking data quality and merge to data base entries
+
+```{r prepare eye tracking meta data}
+
+###--> CHECK corresponding ET data ####
+
+et_demogr<-read_xlsx(eyetracking_dataquality_file,col_types = 'text')
+
+#convert to date
+et_demogr$date<-as.Date.numeric(as.numeric(et_demogr$date), origin="1900-01-01")
+
+#reduce to relevant
+et_demogr<-et_demogr[,1:8]
+
+#fix false entry
+et_demogr$date[221]<-'2022-04-01'
+
+et_demogr$quality.of.calibration<-et_demogr$`quality of calibration`
+
+calib_quality<-rep(NA,nrow(et_demogr))
+calib_quality<-with(et_demogr,ifelse(grepl('good',quality.of.calibration),'good',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('ok',quality.of.calibration),'good',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('moderate',quality.of.calibration),'medium',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('medium',quality.of.calibration),'medium',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('bad',quality.of.calibration),'bad',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('low',quality.of.calibration),'bad',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('failed',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('no calibration',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(grepl('not possible',quality.of.calibration),'failed',calib_quality))
+calib_quality<-with(et_demogr,ifelse(is.na(calib_quality),'else',calib_quality))
+
+et_demogr<-data.frame(et_demogr,calib_quality)
+
+#reorder levels
+et_demogr$calib_quality<-factor(et_demogr$calib_quality,levels=c('good','medium','bad','failed','else'))
+
+#rename variables
+names(et_demogr)[2]<-"t"
+
+#remove duplicates
+table(duplicated(interaction(et_demogr$ID,et_demogr$t)))
+interaction(et_demogr$ID,et_demogr$t)[duplicated(interaction(et_demogr$ID,et_demogr$t))]
+##--> remove duplicated data (session data not saved / battery aborted)
+delete_rows<-c(49,209,275)
+et_demogr<-et_demogr[-delete_rows,]
+
+#fix timepoint
+table(et_demogr$t)
+table(demogr$t)
+et_demogr$t<-ifelse(et_demogr$t %in% c('baseline','Baseline','T1'),'T2',et_demogr$t)
+et_demogr$t<-gsub('fu','FU',et_demogr$t)
+et_demogr$t<-ifelse(grepl('K',et_demogr$ID) & et_demogr$t=='FU','FU2',et_demogr$t) 
+#--> consider that controls have a later follow-up
+
+#assessments per timepoint
+with(et_demogr,table(t))
+
+#select relevant variables and define group
+et_demogr<-select(et_demogr,ID,t,date,version,comment,tester,calib_quality)
+names(et_demogr)[names(et_demogr)=='version']<-'et_battery_version'
+names(et_demogr)[names(et_demogr)=='date']<-'date_et'
+
+#merge
+et_demogr$ID[!et_demogr$ID %in% demogr$ID_Studie]
+et_demogr<-et_demogr[!et_demogr$ID=='942_K',]
+demogr$ID_Studie<-ifelse(demogr$ID_Studie=='980_k','980_K',demogr$ID_Studie)
+
+demogr<-merge(demogr,et_demogr,by.x=c('ID_Studie','t'),by.y=c('ID','t'),all.x=T)
+
+```
+
+# reorder timepoint variable
+
+```{r timepoint variable}
+
+##reorder factor
+et_demogr$t<-factor(et_demogr$t,levels=c('T2','T4','T6','FU2','FU3','FU4'))
+demogr$t<-factor(demogr$t,levels=c('T1','T2','T3','T4','T5','T6','FU','FU2','FU3'))
+
+```
+
+# define date at timepoint
+
+```{r date}
+
+names(demogr)
+
+
+t_date<-demogr$date_escs
+t_date[is.na(t_date)]<-demogr$date_cbcl[is.na(t_date)]
+t_date[is.na(t_date)]<-demogr$date_boscc[is.na(t_date)]
+t_date[is.na(t_date)]<-demogr$date_iq[is.na(t_date)]
+t_date[is.na(t_date)]<-demogr$date_srs[is.na(t_date)]
+t_date[is.na(t_date)]<-demogr$date_rbsr[is.na(t_date)]
+t_date[is.na(t_date)]<-as.character(format(demogr$date_et, "%d.%m.%Y"))[is.na(t_date)]
+
+t_date<-as.Date(t_date,format = "%d.%m.%Y")
+hist(t_date,30)
+table(is.na(t_date))
+
+demogr$t_date<-t_date
+
+```
+
+# define group
+
+```{r group definition}
+
+## define group and save to files
+demogr$group <- "autistic"
+demogr$group[grep("_K",demogr$ID_Studie)]<-"non autistic"
+
+with(demogr,table(Gruppe,group))
+
+```
+
+# define age
+
+```{r define age}
+
+demogr$Geburt_Index<-as.Date(demogr$Geburt_Index)
+
+demogr$t_age<-as.numeric(demogr$t_date - demogr$Geburt_Index)/30
+hist(demogr$t_age)
+
+```
+
+
+#save to file
+
+```{r save }
+
+#save(demogr, et_demogr, file=paste0(savepath,'demogr_total_0324.Rdata'))
+save(demogr, et_demogr, file=paste0(savepath,'demogr_total_0424.Rdata'))
+
+```
+
