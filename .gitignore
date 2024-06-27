@@ -7,7 +7,7 @@
 analysis/*html
 analysis/*_cache
 analysis/site_libs
-manuscript/*
+manuscript/
 data/*
 data/
 docs/site_libs/
