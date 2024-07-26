@@ -43,8 +43,8 @@ require(performance) #r²_nakagawa - marginalized and conditionalk R²
 require(pwrss) #power calculation
 
 #set include visualization to FALSE for faster knitting
-include_visualization<-FALSE
-render_animation<-FALSE
+include_visualization<-TRUE
+render_animation<-TRUE
 
 #for faster visualization, select fraction of data to visualize (default 0.1 = 10%)
 fraction_to_sample<-0.1 
@@ -72,6 +72,9 @@ logit2prob <- function(logit){
 - data is loaded from different files and converted to a format that can be analyzed in linear mixed models
 
 ## load data
+
+- data on local machine
+- available on reasonable request
 
 ```{r load data}
 
@@ -138,7 +141,7 @@ hist(demogr$t_age)
 demogr$ID_Studie_merge<-gsub('_K','',demogr$ID_Studie)
 demogr$ID_Studie_merge<-gsub('-K','',demogr$ID_Studie_merge)
 
-table(demogr$ID_Studie_merge)
+#table(demogr$ID_Studie_merge)
 
 #extract IQ data
 baseline_nonverbal_iq<-demogr$nonverbal_iq[demogr$t=='T1']
@@ -199,6 +202,8 @@ df_trial<-merge(df_trial,df_iq_baseline,by='pic',all.x=T)
 
 ## rename gender
 
+- from German names to international
+
 ```{r}
 
 #rename variables
@@ -209,7 +214,10 @@ df_trial$gender<-ifelse(df_trial$Geschlecht_Index=='weiblich','f','m')
 
 ## define group variable
 
--   3 groups: autistic (A-FFIP), autistic (TAU), non-autistic
+-   3 groups: 
+  - autistic (early intervention: A-FFIP) 
+  - autistic (early intervention as usual: EAIU), 
+  - non-autistic
 
 ```{r group definition}
 
@@ -224,6 +232,8 @@ levels(demogr$rndm)<-c('autistic A-FFIP','autistic TAU','non autistic')
 ```
 
 ## merge demographic data to eye-tracking sample data
+
+- data derived from eye-tracker is merged with corresponding database entries
 
 ```{r merge to raw data}
 
@@ -346,6 +356,7 @@ demogr<-demogr[!(demogr$ID_Studie_merge %in% exclude_ids),]
 ```
 
 - exclude ids in non-autistic group with highest non verbal IQ 
+- currently not evaluated
 
 ```{r, eval=F}
 
@@ -409,6 +420,7 @@ demogr<-demogr[!demogr$id %in% exclude_ids,]
 ## descriptive table - 3 groups
 
 -   statistics table of non-autistic, autistic TAU, and autistic A-FFIP (treatment) groups
+-   T4 timepoint (+6months) not considered for reasons of model parsimony
 
 ```{r sample description - table 1}
 
@@ -474,9 +486,9 @@ asd_severity_followup<-with(df_sample[df_sample$t %in% c('FU2') & df_sample$rndm
 
 ###ET variables to one value per timepoint
 rja_baseline<-with(df_et_agg[df_et_agg$t %in% c('T2'),],
-                   fun_return_descriptive(rja_occurances/16,rndm))
+                   fun_return_descriptive(rja_any/16*100,rndm))
 rja_followup<-with(df_et_agg[df_et_agg$t %in% c('FU2'),],
-                   fun_return_descriptive(rja_occurances/16,rndm))
+                   fun_return_descriptive(rja_any/16*100,rndm))
 
 rja_s_baseline<-with(df_et_agg[df_et_agg$t %in% c('T2'),],
                    fun_return_descriptive(rja_duration,rndm))
@@ -499,9 +511,9 @@ fixation_followup<-with(df_et_agg[df_et_agg$t %in% c('FU2'),],
                    fun_return_descriptive(fixation_duration,rndm))
 
 dataquality_baseline<-with(df_et_agg[df_et_agg$t %in% c('T2'),],
-                   fun_return_descriptive(no_data,rndm))
+                   fun_return_descriptive(no_data*100,rndm))
 dataquality_followup<-with(df_et_agg[df_et_agg$t %in% c('FU2'),],
-                   fun_return_descriptive(no_data,rndm))
+                   fun_return_descriptive(no_data*100,rndm))
 
 #create one data frame
 descriptives_table<-rbind(
@@ -554,7 +566,7 @@ ados_b_f<-with(df_sample[df_sample$t=='FU2' & df_sample$rndm!='non autistic',],t
 
 var_names<-c(
   'timepoints (baseline/follow-up)',
-  'gender (female/male)',
+  'biological sex (female/male)',
   'age (m)',
   '',
   'developmental age (m)',
@@ -569,7 +581,7 @@ var_names<-c(
   '',
   'ADOS CSS',
   '',
-  'RJA (n per trial)',
+  'RJA likelihood (%)',
   '',
   'RJA duration (s)',
   '',
@@ -579,7 +591,7 @@ var_names<-c(
   '',
   'total fixation duration (s)',
   '',
-  'mean missing data (0-1)',
+  'mean missing data (%)',
   ''
   )
 
@@ -618,11 +630,12 @@ descriptives_table<-cbind(var_names,timepoint_labels,descriptives_table)
 
 table_sample<-descriptives_table %>%
   kbl(caption = "Table 1. Sample description: autistic and non-autistic  groups at baseline and follow-up.",
-      col.names = c('','timepoints','A-FFIP - autistic individuals','TAU - autistic individuals','non-autistic individuals'),
+      col.names = c('','timepoints','A-FFIP - autistic individuals','EIAU - autistic individuals','non-autistic individuals'),
       row.names = F) %>%
   kable_classic(full_width = F, html_font = "Cambria") %>%
   #adds solid line after every row
-  row_spec(seq(0, nrow(descriptives_table), 2)[-1], extra_css = "border-bottom: 1px solid;")
+  row_spec(seq(0, nrow(descriptives_table), 2)[-1], extra_css = "border-bottom: 1px solid;")%>%
+  footnote(general = "Mean / SD [Min - Max]")
 
 table_sample
 
@@ -661,7 +674,7 @@ fun_return_descriptive<-function(variable,group,rounding=2,scaling=1){
 
 #interested variables on group level:
 n_timepoint<-sapply(with(df_sample,by(t,rndm,table)),
-                    function(x){paste(x[1],'/',x[2],'/',x[3],'/',x[4])})
+                    function(x){paste(x[1],'/',x[3],'/',x[4])})
 
 gender_sample<-sapply(with(df_sample[df_sample$t=='T2',],by(gender,rndm,table)),
        function(x){paste(x[1],'/',x[2])})
@@ -698,16 +711,20 @@ cbcl_T4<-with(df_sample[df_sample$t=='T4',],fun_return_descriptive(CBCL_T_GES,rn
 cbcl_T6<-with(df_sample[df_sample$t=='T6',],fun_return_descriptive(CBCL_T_GES,rndm))
 cbcl_FU<-with(df_sample[df_sample$t=='FU2',],fun_return_descriptive(CBCL_T_GES,rndm))
 
+##ESCS RJA
+escs_rja_T2<-with(df_sample[df_sample$t=='T2',],fun_return_descriptive(Total_RJA,rndm))
+escs_rja_T6<-c('-','-')
+escs_rja_FU<-c('-','-')
 
 ###ET variables to one value per timepoint
 rja_T2<-with(df_et_agg[df_et_agg$t %in% c('T2') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(rja_occurances/16,rndm))[1:2]
+                   fun_return_descriptive(rja_any/16*100,rndm))[1:2]
 rja_T4<-with(df_et_agg[df_et_agg$t %in% c('T4') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(rja_occurances/16,rndm))[1:2]
+                   fun_return_descriptive(rja_any/16*100,rndm))[1:2]
 rja_T6<-with(df_et_agg[df_et_agg$t %in% c('T6') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(rja_occurances/16,rndm))[1:2]
+                   fun_return_descriptive(rja_any/16*100,rndm))[1:2]
 rja_FU<-with(df_et_agg[df_et_agg$t %in% c('FU2') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(rja_occurances/16,rndm))[1:2]
+                   fun_return_descriptive(rja_any/16*100,rndm))[1:2]
 
 rja_s_T2<-with(df_et_agg[df_et_agg$t %in% c('T2') & df_et_agg$rndm!='non autistic',],
                    fun_return_descriptive(rja_duration,rndm))[1:2]
@@ -750,14 +767,14 @@ fixation_FU<-with(df_et_agg[df_et_agg$t %in% c('FU2') & df_et_agg$rndm!='non aut
 
 
 dataquality_T2<-with(df_et_agg[df_et_agg$t %in% c('T2') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(no_data,rndm))[1:2]
+                   fun_return_descriptive(no_data*100,rndm))[1:2]
 dataquality_T4<-with(df_et_agg[df_et_agg$t %in% c('T4') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(no_data,rndm))[1:2]
+                   fun_return_descriptive(no_data*100,rndm))[1:2]
 dataquality_T6<-with(df_et_agg[df_et_agg$t %in% c('T6') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(no_data,rndm))[1:2]
+                   fun_return_descriptive(no_data*100,rndm))[1:2]
 
 dataquality_FU<-with(df_et_agg[df_et_agg$t %in% c('FU2') & df_et_agg$rndm!='non autistic',],
-                   fun_return_descriptive(no_data,rndm))[1:2]
+                   fun_return_descriptive(no_data*100,rndm))[1:2]
 
 
 #create one data frame
@@ -765,102 +782,108 @@ descriptives_table<-rbind(
   n_timepoint,
   gender_sample,
   age_T2,
-  age_T4,
+  #age_T4,
   age_T6,
   age_FU,
   iq_T2,
-  iq_T4,
+  #iq_T4,
   iq_T6,
   iq_FU,
   srs_T2,
-  srs_T4,
+  #srs_T4,
   srs_T6,
   srs_FU,
   rbsr_T2,
-  rbsr_T4,
+  #rbsr_T4,
   rbsr_T6,
   rbsr_FU,
   # boscc_T2,
   # boscc_T4,
   # boscc_T6,
   cbcl_T2,
-  cbcl_T4,
+  #cbcl_T4,
   cbcl_T6,
   cbcl_FU,
+  escs_rja_T2,
+  escs_rja_T6,
+  escs_rja_FU,
   rja_T2,
-  rja_T4,
+  #rja_T4,
   rja_T6,
   rja_FU,
   rja_s_T2,
-  rja_s_T4,
+  #rja_s_T4,
   rja_s_T6,
   rja_s_FU,
   pd_T2,
-  pd_T4,
+  #pd_T4,
   pd_T6,
   pd_FU,
   sepr_T2,
-  sepr_T4,
+  #sepr_T4,
   sepr_T6,
   sepr_FU,
   fixation_T2,
-  fixation_T4,
+  #fixation_T4,
   fixation_T6,
   fixation_FU,
   dataquality_T2,
-  dataquality_T4,
+  #dataquality_T4,
   dataquality_T6,
   dataquality_FU
 )
 
 var_names<-c(
-  'timepoints (BL/+6M/+12M/+36M)',
-  'gender (female/male)',
+  'timepoints (BL/+12M/+36M)',
+  'biological sex (female/male)',
   'age (m)',
-  '',
+  #'',
   '',
   '',
   'nonverbal IQ',
-  '',
+  #'',
   '',
   '',
   'SRS-16 total',
-  '',
+  #'',
   '',
   '',
   'RBSR total',
-  '',
+  #'',
   '',
   '',
   # 'BOSCC total',
   # '',
   # '',
   'CBCL total t-score',
+  #'',
   '',
   '',
+  'ESCS RJA (%)',
   '',
-  'RJA (n per trial)',
   '',
+  'RJA likelihood (%)',
+  #'',
   '',
   '',
   'RJA duration (s)',
-  '',
+  #'',
   '',
   '',
   'baseline pupil size (mm)',
-  '',
+  #'',
   '',
   '',
   'stimulus-evoked pupillary response (mm)',
-  '',
+  #'',
   '',
   '',
   'total fixation duration (s)',
-  '',
+  #'',
   '',
   '',
   'mean missing data (0-1)',
-  '',
+  #'',
   '',
   ''
   )
@@ -869,50 +892,54 @@ timepoint_labels<-c(
   '',
   '',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
+  '+12 months',
+  '+36 months',
+  'baseline',
+  #'+6 months',
   '+12 months',
   '+36 months',
   # 'baseline',
   # '+6 months',
   # '+12 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months',
   'baseline',
-  '+6 months',
+  #'+6 months',
   '+12 months',
   '+36 months'
 )
@@ -920,12 +947,13 @@ timepoint_labels<-c(
 descriptives_table<-cbind(var_names,timepoint_labels,descriptives_table)
 
 table_sample<-descriptives_table %>%
-  kbl(caption = "Table 2. Sample description: autistic groups across timepoints.",
-      col.names = c('','timepoints','A-FFIP - autistic individuals','TAU - autistic individuals'),
+  kbl(caption = "Table 2. Sample description: autistic groups at baseline (BL), end-of-treatment (+12M), and follow-up (+36M).",
+      col.names = c('','timepoints','A-FFIP - autistic individuals','EAIU - autistic individuals'),
       row.names = F) %>%
   kable_classic(full_width = F, html_font = "Cambria") %>%
   #adds solid line after every row
-  row_spec(c(2,seq(2, nrow(descriptives_table), 4)[-c(1)]), extra_css = "border-bottom: 1px solid;")
+  row_spec(c(2,seq(2, nrow(descriptives_table), 3)[-c(1)]), extra_css = "border-bottom: 1px solid;") %>%
+  footnote(general = "Mean / SD [Min - Max]")
 
 table_sample
 
@@ -982,6 +1010,32 @@ g3<-ggplot(demogr[!is.na(demogr$srs16_sum) & demogr$t %in% c('T1','T2') & !is.na
 grid.arrange(g1,g2,g3)
 
 ```
+
+## date of assessment variation
+
+- provide variation of date of assessment for section "procedure" in manuscript
+- in months: first = end-of-treatment - baseline, second: follow-up - baseline
+
+```{r}
+
+demogr_ass<-demogr[demogr$t %in% c('T2','T6','FU2') & substr(demogr$ID_Studie,1,3) %in% unique(df_trial$pic),]
+demogr_ass<-demogr_ass[,names(demogr_ass) %in% c('ID_Studie','t','Gruppe','t_date')]
+demogr_ass$t<-droplevels(as.factor(demogr_ass$t))
+
+demogr_ass<-reshape2::dcast(demogr_ass,ID_Studie+Gruppe~t,
+                          value.var = 't_date')
+
+
+timespan_T6_T2<-with(demogr_ass,T6-T2)/30
+by(timespan_T6_T2,demogr_ass$Gruppe,sd,na.rm=T)
+
+timespan_FU2_T2<-with(demogr_ass,FU2-T2)/30
+by(timespan_FU2_T2,demogr_ass$Gruppe,sd,na.rm=T)
+by(timespan_FU2_T2,demogr_ass$Gruppe,range,na.rm=T)
+
+
+```
+
 
 # data inspection 
 ## eye-tracking calibration quality
@@ -1169,8 +1223,8 @@ gif_1<-animate(animated_gaze, duration = 10, fps = 10, width = 800, height = 800
                renderer = gifski_renderer())
 anim_save(file=paste0(project_path,'/output/gaze_animation_time_2ddensity_position300424.gif'),gif_1)
 
-hist(df_jointatt$time_s)
-#ACROSS GROUPS
+
+#ACROSS GROUPS - overall plot 
 animated_gaze<-ggplot(df_jointatt[df_jointatt$time_s>9 & df_jointatt$time_s<11,],
                       aes(x=gazepos_x,y=gazepos_y))+
   stat_density_2d(aes(fill=after_stat(density)), n=50, geom = "raster", contour = FALSE) +
@@ -1185,11 +1239,31 @@ animated_gaze<-ggplot(df_jointatt[df_jointatt$time_s>9 & df_jointatt$time_s<11,]
   #animation specific
   #transition_time(time_s)+facet_wrap(~timepoint)
   transition_time(time_s)+
-  ggtitle('Gaze behavior between groups','time: {frame_time}')
+  ggtitle('Gaze behavior across groups','time: {frame_time}')
 
 gif_1<-animate(animated_gaze, duration = 10, fps = 10, width = 800, height = 800, 
                renderer = gifski_renderer())
 anim_save(file=paste0(project_path,'/output/gaze_animation_las2s.gif'),gif_1)
+
+
+#BETWEEN GROUPS - between target position
+animated_gaze<-ggplot(df_jointatt,
+                      aes(x=gazepos_x,y=gazepos_y))+
+  stat_density_2d(aes(fill=after_stat(density)), n=50, geom = "raster", contour = FALSE) +
+  scale_fill_gradientn(colours = c("black","white","red","orange","yellow","green","blue"),
+                       values = c(1.0,0.5,0.2,0.15,0.1,0.05,0))+
+  ylim(1,0)+xlim(0,1)+coord_fixed(ratio = 9/16)+
+  facet_grid(position~rndm)+
+  theme_bw()+
+  theme(legend.position="none")+
+  #animation specific
+  transition_time(time_s)+
+  ggtitle(label = 'Gaze behavior between groups within trials',
+          subtitle = 'time: {frame_time}')
+
+gif_1<-animate(animated_gaze, duration = 10, fps = 10, width = 1920, height = 1080, 
+               renderer = gifski_renderer())
+anim_save(file=paste0(project_path,'/output/gaze_animation_by_group_and_target_position.gif'),gif_1)
 
 ```
 
@@ -1343,6 +1417,73 @@ ggplot(df_jointatt,
 ```
 
 
+
+## baseline pupil size
+
+- shows that BPS reflects arousal and not a luminance adaptation
+
+```{r BPS, eval=include_visualization}
+
+##define percentage of data sampling for visualization
+subsample<-sample(1:nrow(df_jointatt),nrow(df_jointatt)/sampling_factor) 
+df_jointatt_plot<-df_jointatt[subsample,]
+#--> select 10% of data for faster plotting (faster rendering)
+
+#select only attention grabber phase
+df_jointatt_plot<-df_jointatt_plot[df_jointatt_plot$time_s<=1,]
+
+## specific to groups
+# ggplot(df_jointatt_plot,aes(x=ts_event/300,y=pd,
+#                             group=rndm,color=rndm,fill=rndm))+
+#   geom_smooth()+geom_vline(linetype=2,xintercept=0.5)+
+#   labs(x='tme in trial (s)',y='pupil size (mm)')+
+#   scale_fill_brewer(palette='Dark2')+ #custom color
+#   scale_color_brewer(palette='Dark2')+ #custom color
+#   labs(color='group',fill='group') #custom labels
+
+
+ggplot(df_jointatt_plot,aes(x=ts_event/300,y=pd))+
+  geom_smooth(color='black',fill='darkgrey')+
+  geom_vline(linetype=2,xintercept=0.5)+
+  labs(x='time in trial (s)',y='pupil size (mm)',title='E.) Baseline pupil size (BPS)')
+ 
+  
+```
+
+## stimulus-evoked pupillary response
+
+```{r SEPR, eval=include_visualization}
+
+##define percentage of data sampling for visualization
+subsample<-sample(1:nrow(df_jointatt),nrow(df_jointatt)/sampling_factor) 
+df_jointatt_plot<-df_jointatt[subsample,]
+#--> select 10% of data for faster plotting (faster rendering)
+
+#select only gaze cued associated response
+df_jointatt_plot<-df_jointatt_plot[df_jointatt_plot$time_s>=4 & df_jointatt_plot$time_s<=6,]
+
+## group specific
+# ggplot(df_jointatt_plot,aes(x=ts_event/300,y=pd,
+#                             group=rndm,color=rndm,fill=rndm))+
+#   geom_smooth(method="lm",formula=y ~ poly(x, 2, raw=TRUE))+
+#   geom_vline(linetype=2,xintercept=c(4.5,5.5))+
+#   labs(x='tme in trial (s)',y='pupil size (mm)')+
+#   scale_fill_brewer(palette='Dark2')+ #custom color
+#   scale_color_brewer(palette='Dark2')+ #custom color
+#   labs(color='group',fill='group') #custom labels
+
+
+ggplot(df_jointatt_plot,aes(x=ts_event/300,y=pd))+
+  geom_smooth(color='black',fill='darkgrey')+
+  geom_vline(linetype=2,xintercept=c(4.5,5.5))+
+  labs(x='time in trial (s)',y='pupil size (mm)',title='F.) Stimulus-evoked pupillary response (SEPR)')
+  
+
+
+```
+
+
+
 ## pupil dilation
 
 ```{r, eval=include_visualization}
@@ -1404,7 +1545,7 @@ ggplot(df_jointatt[subsample,],aes(x=ts_event/300,y=rpd,group=t,color=t))+
 
 # correlation table
 
-```{r}
+```{r, eval=F}
 
 res <- Hmisc::rcorr(as.matrix(df_et_agg[,names(df_et_agg) %in% c("baseline_pd",
                                                           "rpd_middle",
@@ -1511,12 +1652,14 @@ df_escs_2<-dplyr::select(df_et_agg[df_et_agg$t %in% c('T2','T4'),],pic,rja_any,t
 df_escs<-merge(df_escs_1,df_escs_2,
                by=c('pic','t'))
 
-ggplot(df_escs,aes(x=rja_any,y=Total_RJA))+geom_point()+geom_smooth(method='lm')
+ggplot(df_escs,aes(x=rja_any/16*100,y=Total_RJA))+geom_point(aes(color=t))+geom_smooth(method='lm',color='black')+
+  labs(x='Eye-tracking: RJA likelihood (%)',y='ESCS: RJA likelihood (%)')
 
 hist(df_escs$rja_any)
 hist(df_escs$Total_RJA)
+#table(df_escs$Total_RJA)
 
-cor.test(df_escs$rja_any,df_escs$Total_RJA,method='pearson')
+#cor.test(df_escs$rja_any,df_escs$Total_RJA,method='pearson')
 
 lmm<-lmer(scale(rja_any)~scale(Total_RJA)+(1|pic),df_escs)
 summary(lmm)
@@ -1551,7 +1694,6 @@ r2_nakagawa(glmm)
 #random effect distribution
 hist(scale(ranef(glmm)$pic),10)
 
-
 #planned contrasts
 confint(contrast(emmeans(glmm,~t|rndm,type = "response"),'revpairwise'))
 emmeans(glmm,~t|rndm,type = "response")
@@ -1580,8 +1722,11 @@ glmm<-glmer(rja_any~t*rndm+
 #model fit
 r2_nakagawa(glmm)  
 
-#random effect distribution
+#random effect distribution --> saved as supplement
 hist(scale(ranef(glmm)$pic),10)
+
+#means at baseline
+emmeans(glmm,~rndm|t,type = "response")
 
 #planned contrasts
 confint(contrast(emmeans(glmm,~t|rndm,type = "response"),'revpairwise'))
@@ -1945,7 +2090,7 @@ res<-mediation::mediate(lmm_mod,glm_outcome,
                         mediator='baseline_pd_z',
                         treat.value = 'autistic A-FFIP',
                         control.value = 'autistic TAU',
-                        covariates = list(t = 'T6'), #check at FU2
+                        covariates = list(t = 'T6'), #check at T6
                         sims=1000)
 
 summary(res)
@@ -1960,6 +2105,7 @@ plot(res)
 ##causal mediation analysis
 ###--> only supports 1 level - one random intercept
 
+df_trial$baseline_pd_z<-scale(df_trial$baseline_pd)
 df_medanalysis<-df_trial[df_trial$t %in% c('T2','FU2') & df_trial$rndm!='non autistic' & !is.na(df_trial$baseline_pd_z),]
 
 glm_outcome<-glmer(rja_any~t*rndm+baseline_pd_z+
@@ -1971,6 +2117,12 @@ lmm_mod<-lme4::lmer(baseline_pd_z~t*rndm+
 
 anova(glm_outcome)
 anova(lmm_mod)
+
+  glm_test<-glmer(rja_any~t*rndm+
+            (1|pic),
+            data=df_medanalysis,family='binomial')
+  emmeans(glm_test,~rndm|t)
+
 res<-mediation::mediate(lmm_mod,glm_outcome, 
                         treat = 'rndm', 
                         mediator='baseline_pd_z',
@@ -2415,6 +2567,10 @@ df_jointatt_plot$phase<-
                                              "target cueing", 
                                              "outro direct gaze"))
 
+#target position as factor
+df_jointatt_plot$position<-as.factor(df_jointatt_plot$position)
+levels(df_jointatt_plot$position)<-c('target left','target right')
+
 ```
 
 ### figure panel - RJA likelihood
@@ -2465,21 +2621,59 @@ subsample<-sample(1:nrow(df_jointatt_plot),nrow(df_jointatt_plot)/sampling_facto
 #adapt data set for plotting
 df_jointatt_plot_pupil<-df_jointatt_plot[subsample,]
 
-#pupil size progression - between conditions
-#--> between timepoints x groups
+# #pupil size progression - between conditions
+# #--> between timepoints x groups
+# g_pupil<-ggplot(df_jointatt_plot_pupil,
+#        aes(x=ts_event/300,y=rpd,group=rndm,color=rndm))+
+#   geom_smooth(aes(fill=rndm))+theme_bw()+
+#   labs(title='D.) pupil size change (mm)',
+#        x='trial duration (s)',
+#        y='')+
+#   geom_vline(xintercept=1)+geom_vline(xintercept=3.5,linetype='dashed')+ #mark video segments
+#   geom_vline(xintercept=9.5,linetype='dashed')+ #mark video segments
+#   scale_fill_brewer(palette='Dark2')+ #custom color
+#   scale_color_brewer(palette='Dark2')+ #custom color
+#   labs(color='group',fill='group')+ #custom labels
+#   facet_grid(t~.)+
+#   theme(legend.position = 'none')
+
+
+#pupil size progression within complete trial across groups
 g_pupil<-ggplot(df_jointatt_plot_pupil,
-       aes(x=ts_event/300,y=rpd,group=rndm,color=rndm))+
-  geom_smooth(aes(fill=rndm))+theme_bw()+
-  labs(title='D.) pupil size change (mm)',
+       aes(x=ts_event/300,y=pd))+
+  geom_smooth(color='black',fill='darkgrey')+
+  labs(title='D.) pupil size change within trials',
        x='trial duration (s)',
-       y='')+
+       y='pupil size (mm)')+
   geom_vline(xintercept=1)+geom_vline(xintercept=3.5,linetype='dashed')+ #mark video segments
   geom_vline(xintercept=9.5,linetype='dashed')+ #mark video segments
-  scale_fill_brewer(palette='Dark2')+ #custom color
-  scale_color_brewer(palette='Dark2')+ #custom color
-  labs(color='group',fill='group')+ #custom labels
-  facet_grid(t~.)+
-  theme(legend.position = 'none')
+  annotate("rect", xmin = 0, xmax = 0.5, ymin = 4, ymax = 4.3, alpha = .2)+ #annotate BPS time span
+  annotate("rect", xmin = 4.5, xmax = 5.5, ymin = 4, ymax = 4.3, alpha = .2)+ #annotate SEPR time span
+  annotate(geom="text", x=0.25, y=4.3, label="BPS")+
+  annotate(geom="text", x=5, y=4.3, label="SEPR")+
+  coord_cartesian(ylim = c(4, 4.3))+
+  #remove y axis title as later combioned to grob
+  theme(axis.title.y=element_blank())
+
+#baseline pupil size 
+#select only attention grabber phase
+df_jointatt_plot_bps<-df_jointatt_plot[df_jointatt_plot$ts_event<=300,]
+g_bps<-ggplot(df_jointatt_plot_bps,aes(x=ts_event/300,y=pd))+
+  geom_smooth(color='black',fill='darkgrey')+
+  annotate("rect", xmin = 0, xmax = 0.5, ymin = 4, ymax = 4.25, alpha = .2)+
+  labs(x='time in trial (s)',y='pupil size (mm)',title='E.) BPS: baseline size')+
+  #remove y axis title as later combioned to grob
+  theme(axis.title.y=element_blank())
+
+#stimulus-evoked pupillary response
+#select only gaze cued associated response
+df_jointatt_plot_sepr<-df_jointatt_plot[df_jointatt_plot$ts_event>=1200 & df_jointatt_plot$ts_event<=1800,]
+g_sepr<-ggplot(df_jointatt_plot_sepr,aes(x=ts_event/300,y=pd))+
+  geom_smooth(color='black',fill='darkgrey')+
+  annotate("rect", xmin = 4.5, xmax = 5.5, ymin = 4.15, ymax = 4.225, alpha = .2)+
+  labs(x='time in trial (s)',y='pupil size (mm)',title='F.) SEPR: evoked response')+
+  #remove y axis title as later combioned to grob
+  theme(axis.title.y=element_blank())
 
 
 ```
@@ -2568,19 +2762,33 @@ mylegend<-g_legend(g1)
 
 ###--> print to file
 #define size and resolution of the resulting figure
-tiff(file=paste0(project_path,"/output/figures/figure_stimulus_material.tiff"), 
-     width=9, height=12, units="in", res=300, compression='lzw') 
+tiff(file=paste0(project_path,"/output/figures/figure_stimulus_material_revised.tiff"), 
+     width=9, height=13, units="in", res=600, compression='lzw') 
+
+# #plot to file
+# grid.arrange(g_image,g_gaze,g_rja,g_pupil,mylegend,
+#              widths= c(1,2,2), # composite 3 and 4 in relation of 3:2
+#              heights = c(2,2,2,4,2,1),
+#              layout_matrix = rbind(c(1,1,1),
+#                                    c(2,2,2),
+#                                    c(2,2,2),
+#                                    c(3,3,4),
+#                                    c(3,3,4),
+#                                    c(5,5,5)))
 
 #plot to file
-grid.arrange(g_image,g_gaze,g_rja,g_pupil,mylegend,
+grob_pupil<-arrangeGrob(g_pupil,g_bps,g_sepr,ncol=1,left='pupil size (mm)')
+grid.arrange(g_image,g_gaze,g_rja,grob_pupil,mylegend,
              widths= c(1,2,2), # composite 3 and 4 in relation of 3:2
-             heights = c(2,2,2,4,2,1),
+             heights = c(2,2,2,3,3,3,1),
              layout_matrix = rbind(c(1,1,1),
                                    c(2,2,2),
                                    c(2,2,2),
                                    c(3,3,4),
                                    c(3,3,4),
+                                   c(3,3,4),
                                    c(5,5,5)))
+
 
 #close operation and save file
 dev.off() 
@@ -2959,39 +3167,37 @@ dev.off()
 
 
 
-## supplement - model overview
+## supplement - date of assessment
 
 ```{r}
 
-#RJA likelihood - intervention model
-glmm<-glmer(rja_any~t*rndm+
-            (1|pic)+(1|index_trial),data=df_trial[df_trial$t %in% c('T2','T6') & 
-                                                    df_trial$rndm!='non autistic',],family='binomial')
+table(demogr$t)
 
-summary(glmm)
+demogr_sup<-demogr[demogr$t %in% c('T2','T6','FU2'),]
+demogr_sup$timepoint<-droplevels(as.factor(demogr_sup$t))
+levels(demogr_sup$timepoint)<-c('baseline','end-of-treatment','follow-up')
 
-table_data_model<-round(car::Anova(glmm,type="III"),3)
+# ggplot(demogr_sup[!is.na(demogr_sup$t_date)& !is.na(demogr_sup$rndm),],aes(x=t_date,fill=timepoint))+
+#   geom_histogram(bins=50)+theme_bw()+
+#   labs(title='assessments across study runtime')+labs(x='date of assessment')
 
-##supplements - full table
-  row_names<-c('intercept','timepoint (T)','group (G)',
-               'T x G')
+tiff(file=paste0(project_path,"/output/supplements/figure_date_of_assessment.tiff"), 
+     width=12, height=4, units="in", res=600, compression='lzw') 
 
-  table_data_model<-cbind(row_names,table_data_model)
 
-  table_data_model
+ggplot(demogr_sup[!is.na(demogr_sup$t_date) & !is.na(demogr_sup$rndm),],aes(x=ID_Bado,y=t_date,color=timepoint))+
+  geom_point()+theme_bw()+labs(x='participant',y='date of assessment')+
+  labs(title='assessments across study runtime')+
+  facet_wrap(~rndm)+
+  scale_color_brewer(palette='Dark2')+
+  theme(axis.text.x = element_blank())
 
-  table_data_model %>%
-    kbl(caption = "Generalized linear mixed model of RJA likelihood",
-        col.names = c('','Sum Sq','df','F','p'),
-        row.names = F) %>%
-    kable_classic(full_width = F, html_font = "Cambria")
+dev.off()
 
 ```
 
 
-## supplement - dropout analysis
-
-# drop out analysis 
+## supplement - drop out analysis 
 
 - participants that completed the RCT or FU did not differ on autism symptom severity, general psychopathology, or eye-tracking data quality
 
@@ -3133,7 +3339,7 @@ save_kable(table_sample, file=paste0(project_path,'/output/supplements/dropout_d
 
 ```
 
-### post-hoc power calculation
+## post-hoc power calculation
 
 ```{r}
 
