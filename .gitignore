@@ -4,7 +4,6 @@
 .Ruserdata
 .Rapp.history
 .DS_Store
-analysis/*html
 analysis/*_cache
 analysis/site_libs
 manuscript/
